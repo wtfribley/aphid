@@ -9,7 +9,7 @@ class Config {
     private static $settings = array();
     
     /**
-     *  Loads settings from the DB - called from bootstrap.php
+     *  Loads settings from the DB - called during bootstrap
      */
     public static function Load() {
         
