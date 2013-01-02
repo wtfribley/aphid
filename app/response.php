@@ -28,7 +28,7 @@ class Response {
             if (file_exists(THEME . $this->controller->view . '.php')) {
             	$path = THEME . $this->controller->view . '.php';    
             }
-            else if (file_exists(PATH . 'app/default_pages/' . $this->controller->view . '.php')) {
+            else if (file_exists(PATH . 'app/views/' . $this->controller->view . '.php')) {
 	            $path = PATH . 'app/default_pages/' . $this->controller->view . '.php';
             }
             else throw new Exception('Specified template file ' . THEME . $this->controller->view . '.php not found.');

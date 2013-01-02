@@ -6,7 +6,7 @@ class Error {
 		$path = THEME . $page . '.php';
 		if (file_exists($path))		
 			require $path;
-		else require PATH . 'app/default_pages/' . $page . '.php';
+		else require PATH . 'app/views/' . $page . '.php';
 		
 		exit(1);
 	}
@@ -42,7 +42,7 @@ class Error {
 		$path = THEME . '500.php';
 		if (file_exists($path))		
 			require $path;
-		else require PATH . 'app/default_pages/500.php';
+		else require PATH . 'app/views/500.php';
 		
 		exit(1);
 	}
