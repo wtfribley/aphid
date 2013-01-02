@@ -12,7 +12,7 @@ class Log {
         $line = date('m-d-Y hA:i:s') . ' [ ' . $severity . ' ] --> ' . $message . PHP_EOL;
         
         // Write to the log file.
-        if($log = @fopen(PATH . 'logs/vault.log', 'a+'))
+        if($log = @fopen(PATH . 'logs/aphid.log', 'a+'))
         {
             fwrite($log, $line);
             fclose($log);
@@ -20,7 +20,7 @@ class Log {
     }
     
     public static function exception($e){
-        self::write('error', self::format($e));
+        static::write('error', static::format($e));
     }
 
     private static function format($e){

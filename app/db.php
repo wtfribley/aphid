@@ -3,14 +3,9 @@
 class DB {
     
     /*
-    *   Connection details - EDIT THIS to match your information.
+    *   Holds the connection details
     */
-    private static $db_config = array (
-        'name' => 'vault',
-        'host' => 'localhost',
-        'user' => 'root',
-        'pass' => 'root'
-    );
+    private static $db_config = array ();
     
     /*
     *  This holds the PDO resource
@@ -18,22 +13,24 @@ class DB {
     private static $dbh = null;
     
     public static function Prepare($sql) {
-        if(is_null(self::$dbh))
-            self::connect();
+        if(is_null(static::$dbh))
+            static::connect();
             
-        return self::$dbh->prepare($sql);
+        return static::$dbh->prepare($sql);
     }
     
     private static function connect() {
         
-        $dbname = self::$db_config['name'];
-        $host = self::$db_config['host'];
-        $user = self::$db_config['user'];
-        $pass = self::$db_config['pass'];
+        static::$db_config = Config::get('db');
+        
+        $dbname = static::$db_config['name'];
+        $host = static::$db_config['host'];
+        $user = static::$db_config['user'];
+        $pass = static::$db_config['pass'];
         
         $dsn = 'mysql:dbname='.$dbname.';host='.$host;
 
-        self::$dbh = new PDO($dsn, $user, $pass);
+        static::$dbh = new PDO($dsn, $user, $pass);
     }
     
 }

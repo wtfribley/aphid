@@ -13,23 +13,36 @@ class Response {
     }
     
     public function send($format = 'json') {
+    	// simply log our results if we're in console mode
+    	if (Config::get('env') == 'console') {
+	    	$testing = print_r($this->controller, true);
+	    	Log::write('testing',$testing);	
+    	}  
         // default to json - simply encode results as json.
-        if ($format == 'json') {
+        else if ($format == 'json') {
             header('Content-Type: application/json; charset=utf8');
             echo json_encode($this->controller->results);
         }
         // if we want to use html views (i.e. templates), we need to do more work...
-        else if ($format == 'html' && (is_null($this->controller->view) === false)) {
-            if (file_exists(PATH . 'views/' . $this->controller->view . '.php')) {
-                ob_start();      
-                    include PATH . 'views/' . $this->controller->view . '.php';
-                    $content = ob_get_clean();
-                
-                header('Content-Type: text/html; charset=utf8');
-                echo $content;
+        else if ($format == 'html' && !is_null($this->controller->view)) {
+            if (file_exists(THEME . $this->controller->view . '.php')) {
+            	$path = THEME . $this->controller->view . '.php';    
             }
-            else throw new Exception('Specified view file ' . PATH . 'views/' . $this->controller->view . '.php not found');
+            else if (file_exists(PATH . 'app/default_pages/' . $this->controller->view . '.php')) {
+	            $path = PATH . 'app/default_pages/' . $this->controller->view . '.php';
+            }
+            else throw new Exception('Specified template file ' . THEME . $this->controller->view . '.php not found.');
+            
+            ob_start();      
+                include $path;
+            $content = ob_get_clean();
+            
+            header('Content-Type: text/html; charset=utf8');
+            echo $content;
         }
+        // no view? let's do the 404!
+        else if (is_null($this->controller->view)) Error::page('404');
+        // we can only do html or json.
         else throw new Exception ('Invalid response format');
     }
 }

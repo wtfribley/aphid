@@ -6,19 +6,52 @@ class Config {
      *  Holds the application's settings.
      *  @var array $settings
      */
-    private static $settings = array();
+    private static $settings = array();       
     
     /**
-     *  Loads settings from the DB - called during bootstrap
+     *  Loads settings from the DB - called during bootstrap.
      */
-    public static function Load() {
+    public static function load() {
+    
+    	static::loadDB();
         
         $query = new Query(array(
             'type' => 'read',
             'table' => 'config'
         ));
         
-        self::$settings = $query->execute();
+        foreach($query->execute() as $row) {
+	    	static::$settings[$row['key']] = $row['value'];    
+        }
+    }
+    
+    /**
+     *	Saves settings back to the DB - called before shutdown.
+     */
+    public static function save() {
+	    // out with the old...
+	    $query = new Query(array(
+	    	'type' => 'delete',
+	    	'table' => 'config'
+	    ));
+	    $query->execute();
+	    
+	    // and in with the new! (note: because the column name is key, we need backticks)
+	    $query = new Query(array(
+	    	'type' => 'create',
+	    	'table' => 'config',
+	    	'data' => array('`key`'=>'','value'=>'')
+	    ));
+	    // we're running a bunch of inserts - so we'll prepare, then iterate.
+	    $stmt = DB::Prepare($query->toSQL());   
+	    foreach (static::$settings as $key => $value) {
+	    	// we don't store database connection info in the database.
+	    	if ($key != 'db') {
+	    		// the console environment must be set explicity in bootstrap.php - it will not be saved.
+	    		if ($key == 'env' && $value == 'console') $value = 'dev';
+		    	$testes = $stmt->execute(array($key,$value));
+	    	}
+	    }
     }
     
     /**
@@ -28,8 +61,8 @@ class Config {
      *  @param mixed $default optional, defaults to false 
      *  @return mixed The desired setting or the passed default. 
      */
-    public static function Get($key, $default = false) {
-        if (isset(self::$settings[$key])) return self::$settings[$key];
+    public static function get($key, $default = false) {
+        if (isset(static::$settings[$key])) return static::$settings[$key];
         else return $default;
     }
     
@@ -39,7 +72,17 @@ class Config {
      * @param string $key
      * @param mixed $value
      */
-    public static function Set($key, $value) {
-        self::$settings[$key] = $value;
+    public static function set($key, $value) {
+        static::$settings[$key] = $value;
+    }
+    
+    /**
+     *	Load up the database config file
+     */
+    private static function loadDB() {
+	    
+	    if (file_exists(PATH . 'config.php'))
+	    	static::$settings['db'] = require PATH . 'config.php';
+	    else throw new Exception('Cannot find database configuration file - this probably means you haven\'t installed Aphid properly or at all.');
     }
 }

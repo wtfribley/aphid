@@ -58,7 +58,8 @@ class Controller {
                 'where' => array('table',$table)
             ));
             
-            $this->view = $view_query->execute();
+            $view = $view_query->execute();
+            if (!empty($view)) $this->view = $view;
         }
     }
     

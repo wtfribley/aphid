@@ -32,27 +32,32 @@ class Query {
      *  Bindings for use in PDO Statements
      */
     private $bindings = array();
+    
+    /**
+     *	If we just want a single field.
+     */
+    private $single_field = false;
 
     /**
-    *   Construct a Query...
-    *
-    *   Pass an array of options (see below) OR a string that identifies
-    *   the query type.
-    *
-    *   Options:
-    *
-    *   $options['type']    = (string) the CRUD type for this query. REQUIRED.
-    *   $options['table']   =     (string) the table to query. REQUIRED.
-    *   $options['fields']  = (mixed) array of fields (or single string) to return on a read query.
-    *   $options['data']    = (array) data for create/update queries. Form of 'field'=>'value'
-    *   $options['where']   = (array) either ('where_field','where_value') assuming an '=' operator 
-    *                       OR ('where_field','operator','where_value).
-    *   $options['orderby'] = (mixed) either ('order_field','order_type') OR simply 'order_field'
-    *                       and order_type defaults to DESC.
-    *   $options['limit']   = (mixed) either ('limit','offset') OR simply 'limit' as an integer.
-    *
-    *   @var $options mixed.
-    */
+     *   Construct a Query...
+     *
+     *   Pass an array of options (see below) OR a string that identifies
+     *   the query type.
+     *
+     *   Options:
+     *
+     *   $options['type']    = (string) the CRUD type for this query. REQUIRED.
+     *   $options['table']   =     (string) the table to query. REQUIRED.
+     *   $options['fields']  = (mixed) array of fields (or single string) to return on a read query.
+     *   $options['data']    = (array) data for create/update queries. Form of 'field'=>'value'
+     *   $options['where']   = (array) either ('where_field','where_value') assuming an '=' operator 
+     *                       OR ('where_field','operator','where_value).
+     *   $options['orderby'] = (mixed) either ('order_field','order_type') OR simply 'order_field'
+     *                       and order_type defaults to DESC.
+     *   $options['limit']   = (mixed) either ('limit','offset') OR simply 'limit' as an integer.
+     *
+     *   @var $options mixed.
+     */
     public function __construct($options) {
      
         // if we've passed an array, we delegate to methods
@@ -116,7 +121,10 @@ class Query {
             }
             $sql = rtrim($sql,',');
         }
-        else $sql = $this->table . '.' . $fields;
+        else {
+        	$this->single_field = true;
+	    	$sql = $this->table . '.' . $fields;    
+        }
         
         $this->sql = str_replace('[FIELDS]', $sql, $this->sql);
     }
@@ -166,11 +174,11 @@ class Query {
         $sql = 'WHERE ';
         
         if (is_null($wherevalue)) {
-            $sql.= $wherefield . '=?';
+            $sql.= '`' . $wherefield . '`=?';
             $this->bindings[] = $operator;
         }
         else {
-            $sql.= $wherefield . $operator . '?';
+            $sql.= '`' . $wherefield . '`' . $operator . '?';
             $this->bindings[] = $wherevalue;
         }
         
@@ -200,27 +208,45 @@ class Query {
         if (is_null($this->type)) throw new Exception('Query must have a type');
         if (is_null($this->table)) throw new Exception('Query must have a table');
         
+        // clean up the sql string.
         $this->clean_sql();
         
         $stmt = DB::Prepare($this->sql);
         $data = $stmt->execute($this->bindings);
         
+        // if we're returning results, we've gotta do some work...
         if ($this->type == 'read') {
             $data = array();
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                
-                // unserialize fails on empty arrays - help it out a bit
-                if($row == 'a:0:{}')
-                    $row = array();
-                // unserialize data if need be
-                if (is_string($row) && @unserialize($row)) $row = unserialize($row);
+            
+            	foreach($row as $key => $value) {
+	            	// unserialize fails on empty arrays - help it out a bit
+	                if($value == 'a:0:{}')
+	                    $row[$key] = array();
+	                // unserialize data if need be
+	                if (is_string($value) && @unserialize($value)) $row[$key] = unserialize($value);	
+            	}        
                 
                 $data[] = $row;            
+            } 
+            
+            // if we're only returning a single row, let's not have a double array.
+            if (count($data) == 1) {
+	            $data = $data[0];
+	            // single row and single field? lets not return an array at all!
+	            if ($this->single_field == true) $data = array_values($data)[0];
             }
-            if (count($data) == 1) $data = $data[0];
         }
         
         return $data;
+    }
+    
+    /*
+    *	Get the query's sql string - only do this once you've run everything else you need to on this query. 
+    */
+    public function toSQL() {
+    	$this->clean_sql();
+	    return $this->sql;
     }
     
     private function clean_sql() {        

@@ -54,13 +54,13 @@ class Request {
         $uri = array();
         if(isset($_SERVER['REQUEST_URI'])) {
             $uri = explode('/', $_SERVER['REQUEST_URI']);
-            $uri = array_slice($uri, 2); // remove an empty first element, second element is always 'api.'
+            $uri = array_slice($uri, 1); // remove an empty first element
         }
         else throw new Exception('Unable to determine the requested URL - REQUEST_URI not set.');        
         $this->path_info = $uri;
         
         // save the requested table name
-        $this->table = $this->options['table'] = $this->path_info(0);
+        $this->table = $this->options['table'] = $this->path_info(0,'index');
         
         // the remainder of the Request will be created depending upon the action required.
         $this->$action();
