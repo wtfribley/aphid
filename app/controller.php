@@ -15,7 +15,7 @@ class Controller {
     /*
     *   Holds the current request object.
     */
-    private $request;
+    public $request;
     
     /*
     *   The action to perform - i.e. the request type.
@@ -29,7 +29,7 @@ class Controller {
         'index'    
     );
     
-    public function __construct($request, $format = 'json') {
+    public function __construct($request) {
         $this->request = $request;
         $this->action = $this->request->action();
         $table = $this->request->table();
@@ -47,7 +47,7 @@ class Controller {
         }
         
         // if we want html, we have to check the templates table...
-        if ($format == 'html') {
+        if ($this->request->format() == 'html') {
             
             $field = (count($this->results) > 1 ? 'plural' : 'single');
             

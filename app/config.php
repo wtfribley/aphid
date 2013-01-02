@@ -47,8 +47,13 @@ class Config {
 	    foreach (static::$settings as $key => $value) {
 	    	// we don't store database connection info in the database.
 	    	if ($key != 'db') {
+	    		
 	    		// the console environment must be set explicity in bootstrap.php - it will not be saved.
 	    		if ($key == 'env' && $value == 'console') $value = 'dev';
+	    		
+	    		// arrays will be json encoded - it's faster than serialize (and don't need benefits of serialize)
+	    		if (is_array($value)) $value = json_encode($value);
+	    		
 		    	$testes = $stmt->execute(array($key,$value));
 	    	}
 	    }

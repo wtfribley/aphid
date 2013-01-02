@@ -223,8 +223,9 @@ class Query {
 	            	// unserialize fails on empty arrays - help it out a bit
 	                if($value == 'a:0:{}')
 	                    $row[$key] = array();
-	                // unserialize data if need be
-	                if (is_string($value) && @unserialize($value)) $row[$key] = unserialize($value);	
+	                // decode json (into assoc array) or unserialize data if need be
+	                if (is_string($value) && @json_decode($value)) $row[$key] = json_decode($value, true);
+	                else if (is_string($value) && @unserialize($value)) $row[$key] = unserialize($value);	
             	}        
                 
                 $data[] = $row;            

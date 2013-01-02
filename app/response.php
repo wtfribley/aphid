@@ -12,13 +12,16 @@ class Response {
         $this->controller = $controller;
     }
     
-    public function send($format = 'json') {
+    public function send() {
+    	// for convenience...
+    	$format = $this->controller->request->format();
+    
     	// simply log our results if we're in console mode
     	if (Config::get('env') == 'console') {
 	    	$testing = print_r($this->controller, true);
 	    	Log::write('testing',$testing);	
     	}  
-        // default to json - simply encode results as json.
+        // want json? simply encode results.
         else if ($format == 'json') {
             header('Content-Type: application/json; charset=utf8');
             echo json_encode($this->controller->results);
@@ -29,7 +32,7 @@ class Response {
             	$path = THEME . $this->controller->view . '.php';    
             }
             else if (file_exists(PATH . 'app/views/' . $this->controller->view . '.php')) {
-	            $path = PATH . 'app/default_pages/' . $this->controller->view . '.php';
+	            $path = PATH . 'app/views/' . $this->controller->view . '.php';
             }
             else throw new Exception('Specified template file ' . THEME . $this->controller->view . '.php not found.');
             

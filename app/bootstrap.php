@@ -60,20 +60,25 @@ date_default_timezone_set(Config::get('timezone','America/Los_Angeles'));
 //		(note: this setting will not be saved - it must be hardcoded here)
 Config::set('env','console');
 
+$permissions = json_encode(array('config'=>'333','login'=>'033'));
+Config::set('permissions',$permissions);
+
 
 /*
- *      Get Request, Send to Controller, Render Output.
+ *      Run Aphid - Follow the Request Object...
  */
 
 $request = new Request();
 
-// @todo: the request object should set this automatically - if we want json, we'll have to ask for it.
-$format = 'html'; // html is the default format, change to 'json' if using Backbone or other such magicks.
+// create a new authentication object...
+$authenticated = new Authentication($request);
 
-$controller = new Controller($request, $format);
+// ...and pass it to the controller.
+$controller = new Controller($authenticated->request());
 
+// create a response and send it where it needs to go.
 $response = new Response($controller);
-$response->send($format);
+$response->send();
 
 
 /*

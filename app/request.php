@@ -1,6 +1,11 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
 class Request {
+
+	/*
+	*	The format in which results will be desired - i.e. the Accept header.
+	*/
+    public $format = 'html';
     
     /*
     *   The CRUD action (i.e. create, read, update, delete).
@@ -45,6 +50,12 @@ class Request {
     
     
     public function __construct() {
+    
+    	// get the desired output format, which will alter behavior down the road.
+    	if (strpos($_SERVER['HTTP_ACCEPT'], 'html') !== false)
+    		$this->format = 'html';
+    	else if (strpos($_SERVER['HTTP_ACCEPT'], 'json') !== false)
+    		$this->format = 'json';
      
         // save the request method (GET, POST, PUT, DELETE) as a CRUD action.
         $this->action = $action = $this->crud_map[$_SERVER['REQUEST_METHOD']];
@@ -66,6 +77,11 @@ class Request {
         $this->$action();
     }
     
+    public function format($test_against = false) {
+	    if ($test_against) return ($test_against == $this->format);
+	    else return $this->format;
+    }
+    
     public function action($test_against = false) {
         if ($test_against) return ($test_against == $this->action);
         else return $this->action;    
@@ -84,8 +100,8 @@ class Request {
         else return $this->options;
     }
     
-    public function data($key = false, $default = false) {
-        if ($key !== false) {
+    public function data($key = null, $default = false) {
+        if (!is_null($key)) {
             if (isset($this->data[$key])) return $this->data[$key];
             else return $default;
         }
