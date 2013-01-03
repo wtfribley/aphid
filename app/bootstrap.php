@@ -28,7 +28,7 @@ Autoloader::register();
 
 
 /*
- *		Set Error Reporting / Handling & Register a Shutdown Function
+ *		Set Error Reporting / Handling & Register Shutdown Functions
  */
 
 error_reporting(-1);

@@ -23,6 +23,16 @@ class Request {
     public $options;
     
     /*
+    *   Which actions are allowed - these defaults are overwritten by Authentication.
+    */
+    public $allow = array(
+        'view' => true,
+        'read' => true,
+        'write' => true,
+        'login' => true
+    );
+    
+    /*
     *   The requested URI, exploded into an array.   
     */
     private $path_info;
@@ -97,15 +107,21 @@ class Request {
             if (isset($this->options[$key])) return $this->options[$key];
             else return $default;
         }
-        else return $this->options;
+        else if (!is_null($this->options)) return $this->options;
+        else return $default;
     }
     
     public function data($key = null, $default = false) {
         if (!is_null($key)) {
-            if (isset($this->data[$key])) return $this->data[$key];
+            if (isset($this->options['data'][$key])) return $this->options['data'][$key];
             else return $default;
         }
-        else return $this->data;
+        else if (isset($this->options['data'])) return $this->options['data'];
+        else return $default;
+    }
+    
+    public function allow($action) {
+        return $this->allow[$action];    
     }
     
     public function path_info($i = false, $default = false) {
@@ -116,6 +132,7 @@ class Request {
         }
         else return $this->path_info;
     }
+    
     
     /*
     *   Populate $this->options['data'] from the request body (i.e. $_POST).
