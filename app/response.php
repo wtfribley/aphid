@@ -16,7 +16,7 @@ class Response {
     	// for convenience...
     	$format = $this->controller->request->format();
     
-    	// simply log our results if we're in console mode
+    	// only log the results if we're in console mode
     	if (Config::get('env') == 'console') {
 	    	$testing = print_r($this->controller, true);
 	    	Log::write('testing',$testing);	
@@ -43,8 +43,6 @@ class Response {
             header('Content-Type: text/html; charset=utf8');
             echo $content;
         }
-        // no view? let's do the 404!
-        else if (is_null($this->controller->view)) Error::page('404');
         // we can only do html or json.
         else throw new Exception ('Invalid response format');
     }

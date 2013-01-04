@@ -60,9 +60,6 @@ date_default_timezone_set(Config::get('timezone','America/Los_Angeles'));
 //		(note: this setting will not be saved - it must be hardcoded here)
 Config::set('env','console');
 
-$permissions = json_encode(array('config'=>'333','login'=>'033'));
-Config::set('permissions',$permissions);
-
 
 /*
  *      Run Aphid - Follow the Request Object...

@@ -1,8 +1,10 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
+// @todo: add configurable error reporting levels based on Config::get('env').
+
 class Error {
 	
-	public static function page($page, $message = null) {
+	public static function page($page, $request = null) {
 		$path = THEME . $page . '.php';
 		if (file_exists($path))		
 			require $path;

@@ -44,13 +44,10 @@ class Controller {
             // are we allowed to do the action requested?
             if ($this->request->allow($this->action)) {
                 
-                // CSRF protection
+                // CSRF protection - javascript MUST include the CSRF token with each write-type request.
                 if ($this->action == 'write') {
-                    if (!isset($this->request->options['data']['csrf']) || ($this->request->data('csrf') != $this->request->session('csrf'))) {
-                        Error::page('500','CSRF attack');                  
-                    }
-                    else if (isset($this->request->options['data']['csrf']))
-                        unset($this->request->options['data']['csrf']);
+                    // @question: can I change this function to alter the object directly (i.e. by reference)? 
+                    $this->$request = Authentication::CSRF($this->request);
                 }
                 
                 // build and run the query.
@@ -58,11 +55,14 @@ class Controller {
                     $this->request->options()
                 );           
                 $this->results = $query->execute();
+                
+                // note that even if no data is found, the template file may STILL BE DISPLAYED
+                //  i.e. it is up to the template (or javascript if returning json) to handle this error!
+                if (empty($this->results)) $this->results['error'][] = '404';
             }
-            // log an error into the results
-            //  the template file or (if json) javascript is responsible for handling these.
+            // again, the template file (or javascript if returning json) is responsible for handling this!
             else {
-                $this->results['error'][] = 'auth';    
+                $this->results['error'][] = '403';    
             }
         }
         
@@ -74,7 +74,7 @@ class Controller {
             
             // if we can't login, we have to show access denied.
             if (!$this->request->allow('view') && !$this->request->allow('login')) {
-                Error:page('531');        
+                Error:page('403', $this->request);        
             }
             
             // view is allowed OR we're going to login
@@ -88,11 +88,16 @@ class Controller {
             ));          
             $view = $view_query->execute();
             
-            // if the view isn't set and we're returning html, we'll get the 404 page.
-            // if we're returning json, it's javascript's responsibility to handle this error.
-            if (empty($view)) $this->results['error'] = '404';
+            // if the view isn't set, we have to show the 404 page.
+            if (empty($view)) Error:page('404', $this->request);
             else $this->view = $view;
         }
+        
+        // a new CSRF token is generated with each request.
+        //  it's up to javascript to include this token with write-type requests.
+        $csrf = Authentication::getToken();
+        Session::set('csrf',$csrf);
+        $this->results['csrf'] = $csrf;
     }
     
     public function index() {

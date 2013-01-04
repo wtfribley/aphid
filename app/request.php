@@ -1,5 +1,10 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
+/**
+ *  @todo: clean up this class...
+ *      run TONS of tests: "normal" requests, AJAX requests, and Backbone RESTful requests
+ */
+
 class Request {
 
 	/*
@@ -21,6 +26,11 @@ class Request {
     *   Options array to be passed to the Query constructor.
     */
     public $options;
+    
+    /*
+    *   Holds the session object.
+    */
+    public $session;
     
     /*
     *   Which actions are allowed - these defaults are overwritten by Authentication.
@@ -60,6 +70,8 @@ class Request {
     
     
     public function __construct() {
+        // open the session.
+        $this->session = new Session();
     
     	// get the desired output format, which will alter behavior down the road.
     	if (strpos($_SERVER['HTTP_ACCEPT'], 'html') !== false)
@@ -118,6 +130,13 @@ class Request {
         }
         else if (isset($this->options['data'])) return $this->options['data'];
         else return $default;
+    }
+    
+    public function session($key, $default = false) {
+        if ($key == 'id' || $key == 'last_id' || $key == 'csrf')
+            return $this->session->$key;
+        else
+            return Session::get($key, $default);
     }
     
     public function allow($action) {
