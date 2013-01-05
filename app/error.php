@@ -1,9 +1,12 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
-// @todo: add configurable error reporting levels based on Config::get('env').
-
 class Error {
 	
+    /**
+     *  Display an error page.
+     *      note that the Request object is available to any error page templates...
+     *      for security's sake, be careful about what information is displayed.
+     */
 	public static function page($page, $request = null) {
 		$path = THEME . $page . '.php';
 		if (file_exists($path))		
@@ -36,15 +39,22 @@ class Error {
 		// log the exception
 		Log::exception($e);
 		
-		// setup and display the error
-		$message = $e->getMessage();
-		$file = str_replace(PATH, '', $e->getFile());		
-		$line = $e->getLine();
-		
-		$path = THEME . '500.php';
-		if (file_exists($path))		
-			require $path;
-		else require PATH . 'app/views/500.php';
+        // check our environment to determine level of detail
+        if (Config::get('env') == 'dev' || Config::get('env') == 'console') {
+        
+            // setup and display the error
+            $message = $e->getMessage();
+            $file = str_replace(PATH, '', $e->getFile());		
+            $line = $e->getLine();
+            
+            require PATH . 'app/views/exception.php';
+        }
+        else {
+            $path = THEME . '500.php';
+            if (file_exists($path))		
+                require $path;
+            else require PATH . 'app/views/500.php';        
+        }
 		
 		exit(1);
 	}

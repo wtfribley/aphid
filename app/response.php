@@ -18,8 +18,8 @@ class Response {
     
     	// only log the results if we're in console mode
     	if (Config::get('env') == 'console') {
-	    	$testing = print_r($this->controller, true);
-	    	Log::write('testing',$testing);	
+	    	$output = print_r($this->controller, true);
+	    	Log::write('output',$output);	
     	}  
         // want json? simply encode results.
         else if ($format == 'json') {
