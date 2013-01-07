@@ -1,0 +1,105 @@
+====================
+####################
+
+A QUICK GUIDE TO RELATIONSHIPS
+
+####################
+====================
+
+#################
+## Many-to-Many
+###################
+
+Ex. get posts by category id
+
+SELECT posts.* FROM posts
+LEFT JOIN posts_categories ON posts_categories.posts-id = posts.id
+WHERE posts_categories.categories-id = $searchterm;
+
+-------
+
+Ex. get posts by category name
+
+SELECT posts.* FROM posts
+LEFT JOIN posts_categories ON posts_categories.posts-id = posts.id
+LEFT JOIN categories ON categories.id = posts_categories.categories-id
+WHERE categories.name = $searchterm;
+
+-------
+
+Ex. Generalized from id - $ResultTable, $SearchTable, $searchterm
+
+$RefTable = $ResultTable_$SearchTable (where the tables are ordered alphabetically)
+
+SELECT * FROM $ResultTable
+LEFT JOIN $RefTable ON $RefTable.$ResultTable-id = $ResultTable.id
+WHERE $RefTable.$SearchTable-id = $searchterm;
+
+-------
+
+Ex. Generalized from field other than id - $ResultTable, $SearchTable, $searchfield, $searchterm
+
+$RefTable (see above)
+
+SELECT * FROM $ResultTable
+LEFT JOIN $RefTable ON $RefTable.$ResultTable-id = $ResultTable.id
+LEFT JOIN $SearchTable ON $SearchTable.id = $RefTable.$SearchTable-id
+WHERE $SearchTable.$searchfield = $searchterm;
+
+#################
+## One-to-Many
+###################
+
+Ex. get comments by post id
+
+SELECT * FROM comments WHERE posts-id = $searchterm;
+
+-------
+
+Ex. get comments by post slug
+
+SELECT * FROM comments
+LEFT JOIN posts ON posts.id = comments.posts-id
+WHERE posts.slug = $searchterm;
+
+-------
+
+Ex. Generalized from id - $ResultTable, $SearchTable, $searchterm
+
+SELECT * FROM $ResultTable WHERE $SearchTable-id = $searchterm;
+
+-------
+
+Ex. Generalized from field other than id = $ResultTable, $SearchTable, $searchfield, $searchterm
+
+SELECT * FROM $ResultTable
+LEFT JOIN $SearchTable ON $SearchTable.id = $ResultTable.$SearchTable-id
+WHERE $SearchTable.$searchfield = $searchterm;
+
+#################
+## Creating New Relationships
+###################
+
+Data required:
+
+$ThisDataType, $RelatedType, $RelationshipType (one-to-many OR many-to-many)
+
+-------
+
+Ex. $RelationshipType == one-to-many
+(NOTE: the order matters - each object of ThisDataType can have many objects of RelatedType, but NOT the other way around.)
+
+ALTER TABLE $RelatedType ADD FIELD $ThisDataType-id INT(11);
+
+-------
+
+Ex. $RelationshipType == many-to-many
+
+$RefTable = $ThisDataType_$RelatedType (sorted alphabetically)
+
+CREATE TABLE $RefTable (
+	$ThisDataType-id INT(11),
+	$RelatedType-id INT(11)
+);
+
+
