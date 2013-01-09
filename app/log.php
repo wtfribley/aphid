@@ -12,7 +12,8 @@ class Log {
         $line = date('m-d-Y hA:i:s') . ' [ ' . $severity . ' ] --> ' . $message . PHP_EOL;
         
         // Write to the log file.
-        if($log = @fopen(PATH . 'logs/aphid.log', 'a+'))
+        $log = Config::get('logfile','aphid');
+        if($log = @fopen(PATH . 'logs/' . $log . '.log', 'a+'))
         {
             fwrite($log, $line);
             fclose($log);

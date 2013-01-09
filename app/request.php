@@ -86,8 +86,9 @@ class Request {
         // explode the URI
         $uri = array();
         if(isset($_SERVER['REQUEST_URI'])) {
-            $uri = explode('/', $_SERVER['REQUEST_URI']);
-            $uri = array_slice($uri, 1); // remove an empty first element
+            // remove the base uri in case we've installed in a subdirectory.
+            $pattern = '/^(' . preg_quote(Config::get('base_uri','/'),'/') . ')/';
+            $uri = explode('/', preg_replace($pattern, '', $_SERVER['REQUEST_URI']));
         }
         else throw new Exception('Unable to determine the requested URL - REQUEST_URI not set.');        
         $this->path_info = $uri;

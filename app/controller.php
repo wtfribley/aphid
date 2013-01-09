@@ -34,7 +34,7 @@ class Controller {
     public function __construct($request) {
         $this->request = $request;
         $table = $this->request->table();        
-        ($request->action('read')) $this->action = 'read' : $this->action = 'write';
+        $this->action = ($request->action('read')) ? 'read' : 'write';
         
         // tables listed in the special_tables array run corresponding methods
         if (in_array($table, $this->special_tables)) {
@@ -89,7 +89,7 @@ class Controller {
             $view = $view_query->execute();
             
             // if the view isn't set, we have to show the 404 page.
-            if (empty($view)) Error:page('404', $this->request);
+            if (empty($view)) Error::page('404', $this->request);
             else $this->view = $view;
         }
         

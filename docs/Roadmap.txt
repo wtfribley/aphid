@@ -2,15 +2,16 @@ APHID Roadmap
 =============
 
 v.01 Spec (i.e. shit I still need to do)
------------------------------------------------
+----------------------------------------
 
-- Errors
+X Errors
 	- allow for different environments (i.e. dev, prod).
 	- create pretty error pages.
 
 - Relationships
-	- allow for one-to-one, one-to-many, and many-to-many table relationships.
-	- extend the Query object with JOIN sql syntaxes.
+	X allow for one-to-one, one-to-many, and many-to-many table relationships.
+	X add to the Query object with JOIN sql syntaxes.
+	- allow for the creation of relationships between tables.
 
 - Clean up the Request Object
 	- code cleanup, merge some stuff

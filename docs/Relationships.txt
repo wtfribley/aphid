@@ -1,80 +1,40 @@
-====================
-####################
+APHID Relationships
+===================
 
-A QUICK GUIDE TO RELATIONSHIPS
+One-to-Many
+-----------
 
-####################
-====================
+Directionality matters in these relationships - the SQL template will change slightly
+depending on whether we're selecting from the "one" table or the "many" table.
 
-#################
-## Many-to-Many
-###################
+SQL string template for One-to-Many
 
-Ex. get posts by category id
+SELECT [FIELDS] FROM [TABLE]
+JOIN [FOREIGN] ON (TABLE.id = FOREIGN.table_id)
+WHERE FOREIGN.field = value;
 
-SELECT posts.* FROM posts
-LEFT JOIN posts_categories ON posts_categories.posts-id = posts.id
-WHERE posts_categories.categories-id = $searchterm;
+SQL string template for Many-to-One
 
--------
+SELECT [FIELDS] FROM [TABLE]
+JOIN [FOREIGN] ON (TABLE.foreign_id = FOREIGN.id)
+WHERE FOREIGN.field = value;
 
-Ex. get posts by category name
+Many-to-Many
+------------
 
-SELECT posts.* FROM posts
-LEFT JOIN posts_categories ON posts_categories.posts-id = posts.id
-LEFT JOIN categories ON categories.id = posts_categories.categories-id
-WHERE categories.name = $searchterm;
+SQL string template for Many-to-Many
 
--------
+Directionality doesn't matter here, but we do have to make sure to create the reference
+table by alphabetically ordering the selection table and foreign table.
 
-Ex. Generalized from id - $ResultTable, $SearchTable, $searchterm
+SELECT [FIELDS] FROM [TABLE] 
+JOIN [REF_TABLE] ON (TABLE.id = REF_TABLE.table_id)
+JOIN [FOREIGN] ON (FOREIGN.id = REF_TABLE.foreign_id)
+WHERE FOREIGN.field = value;
 
-$RefTable = $ResultTable_$SearchTable (where the tables are ordered alphabetically)
+SELECT [FIELDS] FROM [TABLE] JOIN [REF] ON [REF_TABLE] JOIN [FOREIGN] ON [REF_FOREIGN] WHERE [WHERE];
 
-SELECT * FROM $ResultTable
-LEFT JOIN $RefTable ON $RefTable.$ResultTable-id = $ResultTable.id
-WHERE $RefTable.$SearchTable-id = $searchterm;
 
--------
-
-Ex. Generalized from field other than id - $ResultTable, $SearchTable, $searchfield, $searchterm
-
-$RefTable (see above)
-
-SELECT * FROM $ResultTable
-LEFT JOIN $RefTable ON $RefTable.$ResultTable-id = $ResultTable.id
-LEFT JOIN $SearchTable ON $SearchTable.id = $RefTable.$SearchTable-id
-WHERE $SearchTable.$searchfield = $searchterm;
-
-#################
-## One-to-Many
-###################
-
-Ex. get comments by post id
-
-SELECT * FROM comments WHERE posts-id = $searchterm;
-
--------
-
-Ex. get comments by post slug
-
-SELECT * FROM comments
-LEFT JOIN posts ON posts.id = comments.posts-id
-WHERE posts.slug = $searchterm;
-
--------
-
-Ex. Generalized from id - $ResultTable, $SearchTable, $searchterm
-
-SELECT * FROM $ResultTable WHERE $SearchTable-id = $searchterm;
-
--------
-
-Ex. Generalized from field other than id = $ResultTable, $SearchTable, $searchfield, $searchterm
-
-SELECT * FROM $ResultTable
-LEFT JOIN $SearchTable ON $SearchTable.id = $ResultTable.$SearchTable-id
-WHERE $SearchTable.$searchfield = $searchterm;
 
 #################
 ## Creating New Relationships

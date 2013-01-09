@@ -3,7 +3,7 @@
 class Query {
     
     /**
-     *  The CRUD type.
+     *  The CRUD type - also including one-to-many, many-to-one, many-to-many.
      */
     private $type = null;
     
@@ -13,13 +13,20 @@ class Query {
     private $table = null;
     
     /**
+     *  The foreign table to search in for relational queries.
+     */
+    private $foreign = null;
+    
+    /**
      *  SQL strings with placeholders.
      */
     private $sql_structures = array(
         'create' => 'INSERT INTO [TABLE] [DATA]',
         'read' => 'SELECT [FIELDS] FROM [TABLE] [WHERE] [ORDERBY] [LIMIT]',
         'update' => 'UPDATE [TABLE] [DATA] [WHERE]',
-        'delete' => 'DELETE FROM [TABLE] [WHERE]'
+        'delete' => 'DELETE FROM [TABLE] [WHERE]',
+        'o-m' => 'SELECT [FIELDS] FROM [TABLE] JOIN [FOREIGN] ON [FOREIGN_KEY] WHERE [WHERE] [ORDERBY] [LIMIT]',
+        'm-m' => 'SELECT [FIELDS] FROM [TABLE] JOIN [REF] ON [REF_TABLE] JOIN [FOREIGN] ON [REF_FOREIGN] WHERE [WHERE] [ORDERBY] [LIMIT]'
     );
     
     /**
@@ -47,7 +54,9 @@ class Query {
      *   Options:
      *
      *   $options['type']    = (string) the CRUD type for this query. REQUIRED.
-     *   $options['table']   =     (string) the table to query. REQUIRED.
+     *   $options['table']   = (string) the table to query. REQUIRED.
+     *   $options['foreign'] = (string) name of a related foreign table, the presence
+     *                       of which indicates that a join must be performed
      *   $options['fields']  = (mixed) array of fields (or single string) to return on a read query.
      *   $options['data']    = (array) data for create/update queries. Form of 'field'=>'value'
      *   $options['where']   = (array) either ('where_field','where_value') assuming an '=' operator 
@@ -66,6 +75,8 @@ class Query {
             if (isset($options['type'])) $this->type($options['type']);
             
             if (isset($options['table'])) $this->table($options['table']);
+            
+            if (isset($options['foreign'])) $this->foreign($options['foreign']);
             
             if (isset($options['fields'])) $this->fields($options['fields']);
             
@@ -97,9 +108,11 @@ class Query {
     }
     
     public function type($type) {
+        $orig_type = $type;
+        if ($type == 'm-o') $type = 'o-m';
         
-        if ($type AND in_array($type, array_keys($this->sql_structures))) {
-            $this->type = $type;
+        if ($type && in_array($type, array_keys($this->sql_structures))) {
+            $this->type = $orig_type;
             $this->sql = $this->sql_structures[$type];
         }
         else
@@ -109,6 +122,35 @@ class Query {
     public function table($table) {
         $this->table = $table;
         $this->sql = str_replace('[TABLE]', $table, $this->sql);
+    }
+                                                                    
+    public function foreign($foreign) {
+        $this->foreign = $foreign;
+        $this->sql = str_replace('[FOREIGN]', $foreign, $this->sql);
+        // now behavior depends on relationship type (including direction!)
+        if ($this->type == 'o-m') {
+            // we want the 'one' in the one-to-many relationship
+            $foreign_key = '(' . $this->table . '.id = ' $foreign . '.' . $this->table . '_id)';
+            $this->sql = str_replace('[FOREIGN_KEY]', $foreign_key, $this->sql);
+        }
+        else if ($this->type == 'm-o') {
+            // we want the 'many' in the one-to-many relationship
+            $foreign_key = '(' . $this->table . '.' $foreign . '_id = ' . $foreign . '.id)';
+            $this->sql = str_replace('[FOREIGN_KEY]', $foreign_key, $this->sql);
+        }
+        else if ($this->type == 'm-m') {
+            // reference table is atable_btable, alphabetically sorted
+            $ref_array = array($foreign, $this->table);
+            sort($ref_array);
+            
+            $ref = $ref_array[0] . '_' . $ref_array[1];
+            $ref_table = '(' . $this->table . '.id = ' . $ref . '.' . $this->table . '_id)';
+            $ref_foreign = '(' . $foreign . '.id = ' . $ref . '.' . $foreign . '_id)';
+            
+            $this->sql = str_replace('[REF]', $ref, $this->sql);
+            $this->sql = str_replace('[REF_TABLE]', $ref_table, $this->sql);
+            $this->sql = str_replace('[REF_FOREIGN]', $ref_foreign, $this->sql);            
+        }
     }
     
     public function fields($fields) {
@@ -170,6 +212,9 @@ class Query {
     }
     
     public function where($wherefield, $operator, $wherevalue = null) {
+        // append the foreign table name if we're doing a relational query
+        if (!is_null($this->foreign))
+            $wherefield = $this->foreign . '.' . $wherefield;
         
         $sql = 'WHERE ';
         
@@ -186,7 +231,7 @@ class Query {
     }
     
     public function orderby($field, $order = 'DESC') {       
-        $sql = 'ORDER BY ' . $field . ' ' . $order;
+        $sql = 'ORDER BY ' . $this->table . '.' . $field . ' ' . $order;
         $this->sql = str_replace('[ORDERBY]', $sql, $this->sql);
     }
     

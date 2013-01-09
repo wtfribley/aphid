@@ -58,7 +58,7 @@ date_default_timezone_set(Config::get('timezone','America/Los_Angeles'));
 
 // setting to 'console' will simply log output, rather than echo anything to the browser.
 //		(note: this setting will not be saved - it must be hardcoded here)
-Config::set('env','console');
+//Config::set('env','console');
 
 
 /*

@@ -21,7 +21,7 @@ class Config {
         ));
         
         foreach($query->execute() as $row) {
-	    	static::$settings[$row['key']] = $row['value'];    
+	    	static::$settings[$row['field']] = $row['value'];    
         }
     }
     
@@ -40,7 +40,7 @@ class Config {
 	    $query = new Query(array(
 	    	'type' => 'create',
 	    	'table' => 'config',
-	    	'data' => array('`key`'=>'','value'=>'')
+	    	'data' => array('field'=>'','value'=>'')
 	    ));
 	    // we're running a bunch of inserts - so we'll prepare, then iterate.
 	    $stmt = DB::Prepare($query->toSQL());   
