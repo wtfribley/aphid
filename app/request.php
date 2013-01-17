@@ -1,13 +1,8 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
-/**
- *  @todo: clean up this class...
- *      run TONS of tests: "normal" requests, AJAX requests, and Backbone RESTful requests
- */
-
 class Request {
-
-	/*
+ 
+    /*
 	*	The format in which results will be desired - i.e. the Accept header.
 	*/
     public $format = 'html';
@@ -25,7 +20,7 @@ class Request {
     /*
     *   Options array to be passed to the Query constructor.
     */
-    public $options;
+    public $options = array();
     
     /*
     *   Holds the session object.
@@ -43,11 +38,6 @@ class Request {
     );
     
     /*
-    *   The requested URI, exploded into an array.   
-    */
-    private $path_info;
-    
-    /*
     *   Mapping of request methods to CRUD.
     */
     private $crud_map = array(
@@ -61,6 +51,7 @@ class Request {
     *   A list of accepted options to check the query string against.
     */
     private $options_list = array(
+        'join', 'on', 'by', 'as',
         'fields',
         'data',
         'where',
@@ -68,6 +59,10 @@ class Request {
         'limit'
     );
     
+    /*
+    *   The requested URI, exploded into an array.   
+    */
+    private $path_info;
     
     public function __construct() {
         // open the session.
@@ -78,10 +73,6 @@ class Request {
     		$this->format = 'html';
     	else if (strpos($_SERVER['HTTP_ACCEPT'], 'json') !== false)
     		$this->format = 'json';
-     
-        // save the request method (GET, POST, PUT, DELETE) as a CRUD action.
-        $this->action = $action = $this->crud_map[$_SERVER['REQUEST_METHOD']];
-        $this->options['type'] = $action;
         
         // explode the URI
         $uri = array();
@@ -93,43 +84,35 @@ class Request {
         else throw new Exception('Unable to determine the requested URL - REQUEST_URI not set.');        
         $this->path_info = $uri;
         
-        // save the requested table name
-        $this->table = $this->options['table'] = $this->path_info(0,'index');
+        // save the requested table name.
+        //  (options needs this as well, to be passed to Query)
+        $this->table = $this->path_info(0,'index');
+        $this->options['table'] = $this->table;
+        
+        // save the request method (GET, POST, PUT, DELETE) as a CRUD action.
+        //  (options needs this as well, to be passed to Query)
+        $this->action = $action = $this->crud_map[$_SERVER['REQUEST_METHOD']];
         
         // the remainder of the Request will be created depending upon the action required.
         $this->$action();
     }
     
-    public function format($test_against = false) {
-	    if ($test_against) return ($test_against == $this->format);
-	    else return $this->format;
+    public function get($property, $default = false) {
+        if (isset($this->$property)) return $this->$property;
+        else return $default;
     }
     
-    public function action($test_against = false) {
-        if ($test_against) return ($test_against == $this->action);
-        else return $this->action;    
+    public function test($property, $test) {
+        if (is_array($test)) return in_array($this->$property, $test);
+        return ($test == $this->$property);    
     }
     
-    public function table($test_against = false) {
-        if ($test_against) return ($test_against == $this->table);
-        else return $this->table;    
-    }
-    
-    public function options($key = false, $default = false) {
-        if ($key !== false) {
+    public function options($key = null, $default = false) {
+        if (!is_null($key)) {
             if (isset($this->options[$key])) return $this->options[$key];
             else return $default;
         }
         else if (!is_null($this->options)) return $this->options;
-        else return $default;
-    }
-    
-    public function data($key = null, $default = false) {
-        if (!is_null($key)) {
-            if (isset($this->options['data'][$key])) return $this->options['data'][$key];
-            else return $default;
-        }
-        else if (isset($this->options['data'])) return $this->options['data'];
         else return $default;
     }
     
@@ -153,31 +136,24 @@ class Request {
         else return $this->path_info;
     }
     
-    
     /*
-    *   Populate $this->options['data'] from the request body (i.e. $_POST).
-    */
-    private function create() {        
-        $this->options['data'] = $_POST;
-    }
-    
-    /*
-    *   Populate $this->options from the URI and the query string (i.e. $_GET).
+    *   read populates $this->options from the $_GET array, handling relationships and the where clause.
     */
     private function read() {
         
         $options = $_GET;
-        $diff = array_values(array_diff(array_keys($options),$this->options_list));
         
+        // parse WHERE options
+        $diff = array_values(array_diff(array_keys($options),$this->options_list));        
         // normal operation dictates that the id is included in the passed GET data.
         if (isset($options['id'])) {
-            $options['where'] = array('id', $options['id']);
+            $options['where'] = $options['id'];
             unset($options['id']);
         }
         // if it is somehow not present, we'll use the URI fragment directly.
         else if ($this->path_info(1)) {
             $id = $this->path_info(1);
-            $options['where'] = array('id', $id);       
+            $options['where'] = $id;       
         }
         // none of the above? if there's an unknown key in the GET array, we'll
         //  assume that it should be used to search the database.
@@ -186,24 +162,17 @@ class Request {
             unset($options[$diff[0]]);
         }
         
-        $this->options = array_merge($this->options, $options);
-    }
-    
-    private function update() {
-        $data = json_decode(file_get_contents('php://input'), true); // return assoc array
-        if (isset($data['false'])) unset($data['false']); // cleanup what Backbone gives us.
-        
-        if (isset($data['id'])) { 
-            $this->options['where'] = array('id',$data['id']);
-            unset($data['id']);
+        if (isset($options['having'])) {
+            $this->action = 'having';
+            
+            $options['join'] = $options['having'];
+            unset($options['having']);
         }
-        else throw new Exception('No ID found in PUT request');
+        if (isset($options['join']) && isset($options['where']))
+            $this->action = 'by';
+        if (isset($options['add']))
+            $this->action = 'add';
         
-        $this->options['data'] = $data;
-    }
-    
-    private function delete() {
-        $data = json_decode(file_get_contents('php://input'), true);            
-        $this->options['where'] = array('id',$data['id']);
+        $this->options = array_merge($this->options, $options);     
     }
 }

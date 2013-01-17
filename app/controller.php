@@ -33,8 +33,8 @@ class Controller {
     
     public function __construct($request) {
         $this->request = $request;
-        $table = $this->request->table();        
-        $this->action = ($request->action('read')) ? 'read' : 'write';
+        $table = $request->get('table');        
+        $this->action = ($request->test('action',array('read','having','by','add'))) ? 'read' : 'write';
         
         // tables listed in the special_tables array run corresponding methods
         if (in_array($table, $this->special_tables)) {
@@ -46,15 +46,13 @@ class Controller {
                 
                 // CSRF protection - javascript MUST include the CSRF token with each write-type request.
                 if ($this->action == 'write') {
-                    // @question: can I change this function to alter the object directly (i.e. by reference)? 
+                    // @todo: can I change this function to alter the object directly (i.e. by reference)? 
                     $this->$request = Authentication::CSRF($this->request);
                 }
                 
                 // build and run the query.
-                $query = new Query(
-                    $this->request->options()
-                );           
-                $this->results = $query->execute();
+                $query = new Query($this->request->action, $this->request->options());
+                $this->results['data'] = $query->execute();
                 
                 // note that even if no data is found, the template file may STILL BE DISPLAYED
                 //  i.e. it is up to the template (or javascript if returning json) to handle this error!
@@ -67,7 +65,7 @@ class Controller {
         }
         
         // if we want html, we have to check the templates table...
-        if ($this->request->format('html')) {
+        if ($this->request->test('format','html')) {
             
             // set the table to login if it's allowed
             if (!$this->request->allow('view') && $this->request->allow('login')) $table = 'login';
@@ -80,8 +78,7 @@ class Controller {
             // view is allowed OR we're going to login
             $field = (count($this->results) > 1 ? 'plural' : 'single');            
             
-            $view_query = new Query(array(
-                'type' => 'read',
+            $view_query = new Query('read',array(
                 'table' => 'templates',
                 'fields' => $field,
                 'where' => array('table',$table)
@@ -97,6 +94,7 @@ class Controller {
         //  it's up to javascript to include this token with write-type requests.
         $csrf = Authentication::getToken();
         Session::set('csrf',$csrf);
+        if (!is_array($this->results)) $this->results = array($this->results);
         $this->results['csrf'] = $csrf;
     }
     

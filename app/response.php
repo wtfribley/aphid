@@ -14,7 +14,7 @@ class Response {
     
     public function send() {
     	// for convenience...
-    	$format = $this->controller->request->format();
+    	$format = $this->controller->request->get('format');
     
     	// only log the results if we're in console mode
     	if (Config::get('env') == 'console') {

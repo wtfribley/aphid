@@ -2,303 +2,418 @@
 
 class Query {
     
-    /**
-     *  The CRUD type - also including one-to-many, many-to-one, many-to-many.
-     */
-    private $type = null;
+    private $table;
     
-    /**
-     *  The table we will be accessing - needed for $this->fields().
-     */
-    private $table = null;
+    private $fields = '[TABLE].*';
     
-    /**
-     *  The foreign table to search in for relational queries.
-     */
-    private $foreign = null;
+    private $add = '';
     
-    /**
-     *  SQL strings with placeholders.
-     */
-    private $sql_structures = array(
+    private $as_field = '';
+    
+    private $left = '';
+    
+    private $join = '';
+    
+    private $on = 'ON ([TABLE].id = [JOIN].[TABLE]_id)';
+    
+    private $where = array();
+    
+    private $orderby = '';
+    
+    private $limit = '';
+    
+    private $groupby = '';
+    
+    private $data = array();
+    
+    private $relationship;
+    
+    private $sql = '';
+    
+    private $bindings = array();
+    
+    private $single_field = false;
+ 
+    private $sql_templates = array(
         'create' => 'INSERT INTO [TABLE] [DATA]',
-        'read' => 'SELECT [FIELDS] FROM [TABLE] [WHERE] [ORDERBY] [LIMIT]',
+        'read' => 'SELECT [FIELDS] [AS] FROM [TABLE] [OPTIONS] [GROUPBY]',
         'update' => 'UPDATE [TABLE] [DATA] [WHERE]',
         'delete' => 'DELETE FROM [TABLE] [WHERE]',
-        'o-m' => 'SELECT [FIELDS] FROM [TABLE] JOIN [FOREIGN] ON [FOREIGN_KEY] WHERE [WHERE] [ORDERBY] [LIMIT]',
-        'm-m' => 'SELECT [FIELDS] FROM [TABLE] JOIN [REF] ON [REF_TABLE] JOIN [FOREIGN] ON [REF_FOREIGN] WHERE [WHERE] [ORDERBY] [LIMIT]'
+        'join' => '[LEFT] JOIN [JOIN] [ON] [WHERE] [ORDERBY] [LIMIT]'
     );
     
     /**
-     *  The SQL string that will be executed - populated by replacing the
-     *  appropriate SQL Structure with relevent data.
+     *  $type: create, read, having, by, add, update, delete.
+     *      - having: get all entries from 'table' having an associated entry from 'join.'
+     *      requires: join, relationship
+     *    
+     *      - by: get entries from table, searching join using 'where.'
+     *      requires: join, relationship, where
+     *    
+     *      - add: get entries from table, append column 'add' from 'join' to results, optionally renaming it as 'as.'
+     *      requires: join, relationship, add
+     *    
+     *  $options['table']: the table from which entries will be returned - required! 
+     *    
+     *  $options['join']: the table used in relational queries (having, by, add).
+     *    
+     *  $options['relationship']: relationship type (o-m, m-o, m-m) - required if using 'join.'
+     *      - o-m: returning results from the 'many' side.
+     *      - m-o: returning results from the 'one' side.
+     *    
+     *  $options['add']: these fields from 'join' will be appended to the results (including 'all' or '*')
+     *      - required if $type == add.
+     *    
+     *  $options['as']: used to rename fields added with $options['add'].
+     *    
+     *  $options['fields']: a field or an array of fields in 'table' to return - defaults to all fields.
+     *    
+     *  $options['where']: an array in the form (field,value) OR (field,operator,value) 
+     *      - can also be an integer, in which case 'id' is assumed for the field and '=' for the operator.
+     *    
+     *  $options['orderly']: the field in which to order descending OR an array in the form (field, order).
+     *    
+     *  $options['limit']: an integer to limit the resulting rows OR an array in the form (limit, offset).
+     *    
+     *  $options['data']: an array of insertion or update data in the form (key=>value). 
      */
-    private $sql;
-    
-    /**
-     *  Bindings for use in PDO Statements
-     */
-    private $bindings = array();
-    
-    /**
-     *	If we just want a single field.
-     */
-    private $single_field = false;
 
-    /**
-     *   Construct a Query...
-     *
-     *   Pass an array of options (see below) OR a string that identifies
-     *   the query type.
-     *
-     *   Options:
-     *
-     *   $options['type']    = (string) the CRUD type for this query. REQUIRED.
-     *   $options['table']   = (string) the table to query. REQUIRED.
-     *   $options['foreign'] = (string) name of a related foreign table, the presence
-     *                       of which indicates that a join must be performed
-     *   $options['fields']  = (mixed) array of fields (or single string) to return on a read query.
-     *   $options['data']    = (array) data for create/update queries. Form of 'field'=>'value'
-     *   $options['where']   = (array) either ('where_field','where_value') assuming an '=' operator 
-     *                       OR ('where_field','operator','where_value).
-     *   $options['orderby'] = (mixed) either ('order_field','order_type') OR simply 'order_field'
-     *                       and order_type defaults to DESC.
-     *   $options['limit']   = (mixed) either ('limit','offset') OR simply 'limit' as an integer.
-     *
-     *   @var $options mixed.
-     */
-    public function __construct($options) {
-     
-        // if we've passed an array, we delegate to methods
-        if (is_array($options)) {
+    public function __construct($type, $options = null) {
+    
+        if (isset($options['table'])) {
+            $this->table = $options['table'];
+        }
+        else throw new Exception('Must specify a table to query.');
             
-            if (isset($options['type'])) $this->type($options['type']);
+        if (isset($options['join'])) {            
+            if (isset($options['relationship'])) $this->relationship = $options['relationship'];
+            else throw new Exception('Must specify relationship type.');
             
-            if (isset($options['table'])) $this->table($options['table']);
+            $this->join = $options['join'];
             
-            if (isset($options['foreign'])) $this->foreign($options['foreign']);
-            
-            if (isset($options['fields'])) $this->fields($options['fields']);
-            
-            if (isset($options['data'])) $this->data($options['data']);
-            
-            if (isset($options['where'])) 
-                call_user_func_array(array($this, 'where'), $options['where']);
-            
-            if (isset($options['orderby'])) {
-                if (is_array($options['orderby']))
-                    call_user_func_array(array($this, 'orderby'), $options['orderby']);
-                else $this->orderby($options['orderby']);
-            }
-            
-            if (isset($options['limit'])) {
-                if (is_array($options['limit']))
-                    call_user_func_array(array($this, 'limit'), $options['limit']);
-                else $this->orderby($options['limit']);
-            }
+            if (isset($options['add'])) $this->add = $options['add'];
+                
+            if (isset($options['as'])) $this->as_field = 'AS ' . $options['as'];
         }
         
-        // if we've passed a string, it should be the query type
-        else if (is_string($options)) {
-            $this->type($options);    
+        if (isset($options['fields'])) $this->fields($options['fields']);
+        
+        if (isset($options['where'])) $this->where($options['where']);
+        
+        if (isset($options['orderby'])) {
+            if (is_array($options['orderby'])) call_user_func_array(array($this, 'orderby'), $options['orderby']);
+            else $this->orderby($options['orderby']);
         }
         
-        // if we've passed something else, we have a problem
-        else throw new Exception('invalid query argument');   
+        if (isset($options['limit'])) {
+            if (is_array($options['limit'])) call_user_func_array(array($this, 'limit'), $options['limit']);
+            else $this->limit($options['limit']);
+        }
+        
+        if (isset($options['groupby'])) $this->groupby($options['groupby']);
+        else $this->groupby = 'GROUP BY ' . $this->table . '.id';
+        
+        if (isset($options['data'])) $this->data($options['data']);
+        
+        $this->$type();
     }
     
-    public function type($type) {
-        $orig_type = $type;
-        if ($type == 'm-o') $type = 'o-m';
-        
-        if ($type && in_array($type, array_keys($this->sql_structures))) {
-            $this->type = $orig_type;
-            $this->sql = $this->sql_structures[$type];
-        }
-        else
-            throw new Exception('invalid query type');
-    }
-    
-    public function table($table) {
-        $this->table = $table;
-        $this->sql = str_replace('[TABLE]', $table, $this->sql);
-    }
-                                                                    
-    public function foreign($foreign) {
-        $this->foreign = $foreign;
-        $this->sql = str_replace('[FOREIGN]', $foreign, $this->sql);
-        // now behavior depends on relationship type (including direction!)
-        if ($this->type == 'o-m') {
-            // we want the 'one' in the one-to-many relationship
-            $foreign_key = '(' . $this->table . '.id = ' $foreign . '.' . $this->table . '_id)';
-            $this->sql = str_replace('[FOREIGN_KEY]', $foreign_key, $this->sql);
-        }
-        else if ($this->type == 'm-o') {
-            // we want the 'many' in the one-to-many relationship
-            $foreign_key = '(' . $this->table . '.' $foreign . '_id = ' . $foreign . '.id)';
-            $this->sql = str_replace('[FOREIGN_KEY]', $foreign_key, $this->sql);
-        }
-        else if ($this->type == 'm-m') {
-            // reference table is atable_btable, alphabetically sorted
-            $ref_array = array($foreign, $this->table);
-            sort($ref_array);
-            
-            $ref = $ref_array[0] . '_' . $ref_array[1];
-            $ref_table = '(' . $this->table . '.id = ' . $ref . '.' . $this->table . '_id)';
-            $ref_foreign = '(' . $foreign . '.id = ' . $ref . '.' . $foreign . '_id)';
-            
-            $this->sql = str_replace('[REF]', $ref, $this->sql);
-            $this->sql = str_replace('[REF_TABLE]', $ref_table, $this->sql);
-            $this->sql = str_replace('[REF_FOREIGN]', $ref_foreign, $this->sql);            
-        }
-    }
-    
-    public function fields($fields) {
-        
-        $sql = '';
-        
-        if (is_array($fields)) {          
-            foreach($fields as $field) {
-                $sql.= $this->table . '.' . $field . ',';
-            }
-            $sql = rtrim($sql,',');
-        }
+    public function fields($fields = null) {
+        if ($fields == 'all' || $fields == '*') { }// do nothing (i.e. use default)
         else {
-        	$this->single_field = true;
-	    	$sql = $this->table . '.' . $fields;    
+            if (is_array($fields)) {
+                $this->fields = '';
+                foreach($fields as $field) {
+                    $this->fields.= $this->table . '.' . $field . ',';
+                }
+                $this->fields = rtrim($this->fields,',');
+            }
+            else if (is_string($fields)) {
+                $this->single_field = true;
+                $this->fields = $this->table . '.' . $fields;    
+            }
         }
-        
-        $this->sql = str_replace('[FIELDS]', $sql, $this->sql);
+    }
+    
+    public function where($where) {
+        if (count($where) == 3) {
+            $this->where = array($where[0],$where[1]);
+            $this->bindings[] = $where[2];
+        }
+        else if (count($where) == 2) {
+            $this->where = array($where[0],'=');
+            $this->bindings[] = $where[1];        
+        }
+        else if (is_numeric($where)) {
+            $this->where = array($this->table . '.id','=');
+            $this->bindings[] = $where;    
+        }
+    }
+    
+    public function orderby($field, $order = 'DESC') {
+        if (strpos($field, '.') === false) $field = $this->table . '.' . $field;
+        $this->orderby = 'ORDER BY ' . $field . ' ' . $order;
+    }
+    
+    public function limit($limit, $offset = null) {       
+        if (is_null($offset)) $this->limit = 'LIMIT ' . $limit;
+        else $this->limit = 'LIMIT ' . $offset . ',' . $limit;        
+    }
+    
+    public function groupby($groupby) {
+        if ($groupby == 'none') $this->groupby = '';
+        else $this->groupby = 'GROUP BY ' . $this->table . '.' . $groupby;
     }
     
     public function data($data) {
+        // serialize arrays    
+        foreach($data as $k => $v) {
+            if(is_array($v)) $data[$k] = serialize($v);
+        }
         
-        if ($this->type == 'create') {
-            $sql = '(';
-            
-            foreach(array_keys($data) as $field) {
-                $sql.= $field . ', ';
-            }
-            $sql = rtrim($sql, ', ');
-            
-            $sql.= ') VALUES (';
+        $this->data = array_keys($data);
+        $this->bindings = array_merge(array_values($data),$this->bindings);
+    }
     
-            foreach($data as $f => $v) {
-                // serialize arrays
-                if(is_array($data[$f])) $data[$f] = serialize($data[$f]);
+    private function create() {
+        $this->sql = $this->sql_templates['create'];
+        
+        if (!empty($this->data)) {
+            $sql = '(';
+                
+            for ($i=0;$i<count($this->data);$i++) {
+                $sql.= $this->data[$i] . ',';
+            }
+            $sql = rtrim($sql, ',');
+  
+            $sql.= ') VALUES (';
+            
+            for ($i=0;$i<count($this->data);$i++) {
                 $sql.= "?,";
             }
             $sql = rtrim($sql, ',');
             
-            $sql.= ')';            
+            $this->data = $sql . ')';
         }
+        else $this->data = '';
+    }
+    
+    private function read() {
+        $this->sql = str_replace('[OPTIONS]','[WHERE] [ORDERBY] [LIMIT]',$this->sql_templates['read']);
+    }
+    
+    private function having() {
+        $this->sql = str_replace('[OPTIONS]',$this->sql_templates['join'],$this->sql_templates['read']);
         
-        if ($this->type == 'update') {
+        switch ($this->relationship) {
+            case 'm-o':
+                $this->on = 'ON ([JOIN].id = [TABLE].[JOIN]_id)';
+                break;
+            case 'm-m':
+                $this->join = array($this->table, $this->join);
+                implode('_',sort($this->join));
+                break;
+        }
+    }
+                                      
+    private function by() {
+        switch ($this->relationship) {
+            case 'o-m':
+                $this->read();
+                $this->where[0] = '`' . $this->table . '.' . $this->join . '_id`';
+                break;
+            case 'm-o':
+                $this->read();
+                break;
+            case 'm-m':
+                $this->sql = str_replace('[OPTIONS]',$this->sql_templates['join'],$this->sql_templates['read']);
+                $this->left = 'LEFT ';
+                $reference = array($this->table, $this->join);
+                implode('_',sort($reference));
+                $this->where[0] = '`' . $reference . '.' . $this->join . '_id`';
+                $this->join = $reference;
+                break;
+        }
+    }
+                                      
+    private function add() {       
+        $this->single_field = false;
+        
+        switch ($this->relationship) {
+            case 'o-m':
+                $this->fields.= ', ' . $this->group_concat();
+                $this->left = 'LEFT ';
+                $this->sql = str_replace('[OPTIONS]',$this->sql_templates['join'],$this->sql_templates['read']);
+                break;
+            case 'm-o':
+                $this->fields.= ', ' . $this->concat();
+                $this->left = 'LEFT ';
+                $this->on = 'ON ([JOIN].id = [TABLE].[JOIN]_id)';
+                $this->sql = str_replace('[OPTIONS]',$this->sql_templates['join'],$this->sql_templates['read']);
+                break;
+            case 'm-m':
+                $this->fields.= ', ' . $this->group_concat();
+                $reference = array($this->table, $this->join);
+                implode('_',sort($reference));
+                $ref_join = 'LEFT JOIN ' . $reference . ' ON (' . $this->table . '.id = ' . $reference . '.' . $this->table . '_id) ';
+                $this->on = 'ON (' . $this->join . '.id = ' . $reference . '.' . $this->join . '_id)';
+                $this->sql = str_replace('[OPTIONS]',$ref_join . $this->sql_templates['join'],$this->sql_templates['read']);
+                break;
+        }
+    }
+                                     
+    private function update() {
+        $this->sql = $this->sql_templates['create'];
+        
+        if (!empty($this->data)) {
             $sql = 'SET ';
-            
-            foreach(array_keys($data) as $field) {
-                $sql.= $field . '=?, ';    
-            }
-            $sql = rtrim($sql, ', ');
-               
-            // serialize arrays
-            foreach($data as $f => $v) {
-                if(is_array($data[$f])) $data[$f] = serialize($data[$f]);
-            }
-        }
-        
-        $this->sql = str_replace('[DATA]', $sql, $this->sql);
-        $this->bindings = array_merge(array_values($data),$this->bindings);
-    }
-    
-    public function where($wherefield, $operator, $wherevalue = null) {
-        // append the foreign table name if we're doing a relational query
-        if (!is_null($this->foreign))
-            $wherefield = $this->foreign . '.' . $wherefield;
-        
-        $sql = 'WHERE ';
-        
-        if (is_null($wherevalue)) {
-            $sql.= '`' . $wherefield . '`=?';
-            $this->bindings[] = $operator;
-        }
-        else {
-            $sql.= '`' . $wherefield . '`' . $operator . '?';
-            $this->bindings[] = $wherevalue;
-        }
-        
-        $this->sql = str_replace('[WHERE]', $sql, $this->sql);
-    }
-    
-    public function orderby($field, $order = 'DESC') {       
-        $sql = 'ORDER BY ' . $this->table . '.' . $field . ' ' . $order;
-        $this->sql = str_replace('[ORDERBY]', $sql, $this->sql);
-    }
-    
-    public function limit($limit, $offset = null) {
-        
-        $sql = '';
-        
-        if (is_null($offset)) $sql = 'LIMIT ' . $limit;
-        else $sql = 'LIMIT ' . $offset . ',' . $limit;
-        
-        $this->sql = str_replace('[LIMIT]', $sql, $this->sql);
-    }
-    
-    /*
-    *   Execute the query via PHP's PDO functionality.
-    */
-    public function execute() {
-        
-        if (is_null($this->type)) throw new Exception('Query must have a type');
-        if (is_null($this->table)) throw new Exception('Query must have a table');
-        
-        // clean up the sql string.
-        $this->clean_sql();
-        
-        $stmt = DB::Prepare($this->sql);
-        $data = $stmt->execute($this->bindings);
-        
-        // if we're returning results, we've gotta do some work...
-        if ($this->type == 'read') {
-            $data = array();
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            
-            	foreach($row as $key => $value) {
-	            	// unserialize fails on empty arrays - help it out a bit
-	                if($value == 'a:0:{}')
-	                    $row[$key] = array();
-	                // decode json (into assoc array) or unserialize data if need be
-	                if (is_string($value) && @json_decode($value)) $row[$key] = json_decode($value, true);
-	                else if (is_string($value) && @unserialize($value)) $row[$key] = unserialize($value);	
-            	}        
                 
-                $data[] = $row;            
-            } 
-            
-            // if we're only returning a single row, let's not have a double array.
-            if (count($data) == 1) {
-	            $data = $data[0];
-	            // single row and single field? lets not return an array at all!
-	            if ($this->single_field == true) $data = array_values($data)[0];
+            for ($i=0;$i<count($this->data);$i++) {
+                $sql.= $this->data[$i] . '=?,';
             }
+            $sql = rtrim($sql, ',');
+            
+            $this->data = $sql;
+        }
+        else $this->data = '';
+    }
+                                     
+    private function delete() {
+        $this->sql = $this->sql_templates['delete'];    
+    }
+                                     
+    public function execute() {
+        // prepare and execute the query
+        $stmt = DB::Prepare($this->parse_sql());
+        $executed = $stmt->execute($this->bindings);
+        
+        // clean the returning data
+        $data = array();
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        
+            foreach($row as $key => $value) {
+                // unserialize fails on empty arrays - help it out a bit
+                if($value == 'a:0:{}')
+                    $row[$key] = array();
+                // decode json (into assoc array) or unserialize data if need be
+                if (is_string($value) && @json_decode($value)) $row[$key] = json_decode($value, true);
+                else if (is_string($value) && @unserialize($value)) $row[$key] = unserialize($value);
+                
+                // explode concatenated results
+                if (!is_null($value) && $key == substr($this->as_field, 3)) {
+                    if (strpos($value,'|') !== false) {
+                        $value = explode('|',$value);
+                        for ($i=0;$i<count($value);$i++) {
+                            if (strpos($value[$i],',') !== false) {
+                                $value[$i] = explode(',',$value[$i]);
+                                $assoc = array();
+                                for ($n=0;$n<count($value[$i]);$n++) {
+                                    $assoc[$this->add[$n]] = $value[$i][$n];        
+                                }
+                                $value[$i] = $assoc;
+                            }
+                        }
+                    }
+                    else if (strpos($value,',')) { 
+                        $value = explode(',',$value);
+                        $assoc = array();
+                        for ($i=0;$i<count($value);$i++) {
+                            $assoc[$this->add[$i]] = $value[$i];        
+                        }
+                        $value = $assoc;
+                    }
+                    $row[$key] = $value;
+                }
+            }        
+            
+            $data[] = $row;            
+        } 
+        
+        // if we're only returning a single row, let's not have a double array.
+        if (count($data) == 1) {
+            $data = $data[0];
+            // single row and single field? lets not return an array at all!
+            if ($this->single_field == true) $data = array_values($data)[0];
         }
         
-        return $data;
+        return (empty($data)) ? $executed : $data;
     }
     
-    /*
-    *	Get the query's sql string - only do this once you've run everything else you need to on this query. 
-    */
-    public function toSQL() {
-    	$this->clean_sql();
-	    return $this->sql;
+    public function parse_sql() {
+        $search = array(
+            '[TABLE]',
+            '[LEFT]',
+            '[JOIN]',
+            '[FIELDS]',
+            '[AS]',
+            '[ON]',
+            '[WHERE]',
+            '[ORDERBY]',
+            '[LIMIT]',
+            '[GROUPBY]',
+            '[DATA]'
+        );
+        
+        // [TABLE] will probably still exist in fields.
+        $this->fields = str_replace('[TABLE]',$this->table,$this->fields);
+        
+        // [TABLE] and [JOIN] will most likely still be in $this->on
+        $this->on = str_replace(array('[TABLE]','[JOIN]'),array($this->table,$this->join),$this->on);
+        
+        // must generate WHERE sql, as it's still an array
+        if (!empty($this->where)) $this->where = 'WHERE ' . implode('',$this->where) . '?';
+        else $this->where = '';
+        
+        // data will usually be an empty array - replace with empty string.
+        if (empty($this->data)) $this->data = '';
+        
+        $replace = array(
+            $this->table,
+            $this->left,
+            $this->join,
+            $this->fields,
+            $this->as_field,
+            $this->on,
+            $this->where,
+            $this->orderby,
+            $this->limit,
+            $this->groupby,
+            $this->data
+        );
+                
+        // do replacement, then strip extra white space
+        return trim(preg_replace('/\s\s+/',' ',str_replace($search, $replace, $this->sql))) . ';';
     }
-    
-    private function clean_sql() {        
-        $this->sql = str_replace('[FIELDS]', '*', $this->sql);        
-        $this->sql = str_replace(array('[WHERE]','[ORDERBY]','[LIMIT]'), '', $this->sql);
-        $this->sql = trim($this->sql);
-        $this->sql.= ';';
+                                     
+    private function concat() {
+        $concat = "CONCAT_WS(',',";
+        
+        if ($this->add == 'all' || $this->add == '*') {
+            $query = new Query('read',array(
+                'table' => 'information_schema.columns',
+                'fields' => 'column_name',
+                'where' => array('table_name',$this->join)
+            ));
+            $fields = $query->execute();
+            foreach ($fields as $field) {
+                $concat.= $this->join . '.' . $field . ',';
+            }
+            $concat = rtrim($concat,',') . ')';
+        }
+        else if (is_array($this->add)) {
+            foreach ($this->add as $field) {
+                $concat.= $this->join . '.' . $field . ',';
+            }
+            $concat = rtrim($concat,',') . ')';
+        }
+        else if (is_string($this->add)) {
+            $concat = $this->join . '.' . $this->add;
+        }
+        
+        return $concat;
+    }
+                                     
+    private function group_concat() {
+        return "GROUP_CONCAT(" . $this->concat() . " SEPARATOR '|')";    
     }
 }

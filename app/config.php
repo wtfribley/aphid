@@ -15,9 +15,9 @@ class Config {
     
     	static::loadDB();
         
-        $query = new Query(array(
-            'type' => 'read',
-            'table' => 'config'
+        $query = new Query('read',array(
+            'table' => 'config',
+            'groupby' => 'none'
         ));
         
         foreach($query->execute() as $row) {
@@ -30,20 +30,18 @@ class Config {
      */
     public static function save() {
 	    // out with the old...
-	    $query = new Query(array(
-	    	'type' => 'delete',
+	    $query = new Query('delete',array(
 	    	'table' => 'config'
 	    ));
 	    $query->execute();
 	    
 	    // and in with the new! (note: because the column name is key, we need backticks)
-	    $query = new Query(array(
-	    	'type' => 'create',
+	    $query = new Query('create',array(
 	    	'table' => 'config',
 	    	'data' => array('field'=>'','value'=>'')
 	    ));
 	    // we're running a bunch of inserts - so we'll prepare, then iterate.
-	    $stmt = DB::Prepare($query->toSQL());   
+	    $stmt = DB::Prepare($query->parse_sql());   
 	    foreach (static::$settings as $key => $value) {
 	    	// we don't store database connection info in the database.
 	    	if ($key != 'db') {
