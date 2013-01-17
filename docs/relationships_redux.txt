@@ -1,0 +1,157 @@
+
+Simple 'One Has Another' Query
+------------------------------
+
+O-M
+
+Get only ones that have manies associated with them:
+
+table = one
+having = many
+
+SELECT table.* FROM table
+JOIN having ON (table.id = having.table_id)
+GROUP BY table.id
+
+M-O (swap table and having in the ON statement)
+
+Get only manies that are associated with a one:
+
+table = many
+having = one
+
+SELECT table.* FROM table
+JOIN having ON (having.id = table.having_id)
+
+M-M (same as O-M, but having turns into reference)
+
+Get only items that are associated with an order (or vice versa):
+
+table = inventory
+having = orders
+
+reference = inventory_orders (alphabetically sorted table and join)
+
+SELECT table.* FROM table
+JOIN reference ON (table.id = reference.table_id)
+GROUP BY table.id
+
+
+Simple 'One By Another' Query
+-----------------------------
+
+O-M
+
+I have the one, getting the many: 
+
+table = many
+join = one
+'where' = one.id
+
+SELECT table.* FROM table WHERE table.join_id = 'where'
+
+M-O
+
+I have the many, getting the one:
+
+table = one
+join = many
+'where' = many.one_id
+
+SELECT table.* FROM table WHERE table.id = 'where'
+
+M-M
+
+I have an order, getting items (or vice versa):
+
+table = inventory
+join = orders
+'where' = orders.id
+
+reference = inventory_orders (alphabetically sorted table and join)
+
+SELECT table.* FROM table
+LEFT JOIN reference ON (table.id = reference.table_id)
+WHERE reference.join_id = 'where' 
+
+
+Complex 'One, Add Another' Query
+--------------------------------
+
+table
+join
+add
+[as]
+
+Concatenation
+
+$concat = 'CONCAT_WS(',','
+
+if add == 'all' || '*'
+	SELECT column_name FROM information_schema.columns
+	WHERE table_schema = 'vault' AND table_name = 'join'
+	foreach ($results as $r)
+		$concat.= join . '.' . $r['column_name'] . ','
+	rtrim(',',$concat)
+	$concat.= ')'
+
+else if is_array(add)
+	foreach (add as $field)
+		$concat.= join . '.' . $field . ','
+	rtrim(',',$concat)
+	$concat.= ')'
+
+else if is_string(add)
+	$concat = join.add
+	
+
+O-M
+
+Get ones, add field(s) from many:
+
+table = one
+join = many
+add = field
+[as]
+
+SELECT table.*, GROUP_CONCAT($concat SEPARATOR '|') [AS as] FROM table
+LEFT JOIN join ON (table.id = join.table_id)
+GROUP BY table.id
+
+M-O
+
+Get manies, add field(s) from one:
+
+table = many
+join = one
+add = field
+[as]
+
+SELECT table.*, $concat [AS as] FROM table
+LEFT JOIN join ON (join.id = table.join_id)
+GROUP BY table.id
+
+M-M
+
+Get orders, add field(s) from inventory (or vice versa):
+
+table = orders
+join = inventory
+add = field
+[as]
+
+SELECT table.*, GROUP_CONCAT($concat SEPARATOR '|') [AS as] FROM table
+LEFT JOIN reference ON (table.id = reference.table_id)
+LEFT JOIN join ON (join.id = reference.join_id)
+GROUP BY table.id
+
+
+Super Complex ('One, Add Many') Relationships
+---------------------------------------------
+
+table
+join
+add
+[as]
+
+

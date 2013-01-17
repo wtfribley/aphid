@@ -1,0 +1,141 @@
+
+
+Things I need to know:
+
+- relationship type
+  - o-m
+  - m-o
+  - m-m
+- table
+- join / having
+
+Options things to know:
+
+- where
+  - usually a single integer, the appropriate id
+  - but CAN be the normal where array (if you know what you're doing)
+- add
+  - the field(s) from the foreign table to include in our results
+- as
+  - the optional renamed field in the new results
+- order by
+- limit
+
+
+$fields = $table . '.*';
+$as = ''
+$left = ''
+$mm_join = ''
+
+SELECT $fields $as FROM $table
+$mm_join
+$left JOIN $join ON ($table.id = $join.$table_id)
+$where
+GROUP BY $table.id
+
+
+
+new Query('having',array(
+  'relationship' => 'o-m',
+  'table' => 'customers',
+  'join' => 'inventory'
+));
+
+public function having() {
+  
+  switch ($this->relationship) {
+    case 'm-o':
+      $this->on = 'ON (' . $this->join . '.id = ' . $this->table . '.' . $this->join . '_id)';
+      break;
+    case 'm-m':
+      $this->join = implode('_',sort(array($this->table, $this->join));
+      break;
+}	
+
+------------------------------
+
+new Query('by',array(
+  'relationship' => 'm-o',
+  'table' => 'inventory',
+  'join' => 'customers'
+  'where' => 0 // this is the same as array('customer_id',0)
+));
+
+public function by() {
+  
+  switch ($this->relationship) {
+    case 'o-m':
+      $this->where[0] = $this->table . '.' $this->join . '_id';
+      $this->join = '';
+      break;
+    case 'm-o':
+      $this->where[0] = $this->table . '.id';
+      $this->join = '';
+      break;
+    case 'm-m':
+      $this->left = 'LEFT ';
+      $reference = implode('_',sort(array($this->table, $this->join));
+      $this->where[0] = $reference . '.' $this->join . '_id';
+      $this->join = $reference;
+      break;
+  }	
+}
+
+------------------------------
+
+new Query('add',array(
+  'relationship' => 'm-m'
+  'table' => 'orders',
+  'join' => 'inventory',
+  'add' => 'asset_tag',
+  'as' => 'items'
+));
+
+public function add() {
+
+  $concat = "CONCAT_WS(',',";
+
+  if ($this->add == 'all' || $this->add == '*') {
+    $query = new Query('read',array(
+      'table' => 'information_schema.columns',
+      'fields' => 'column_name',
+      'where' => array('table_name',$this->join)
+    ));
+    $fields = $query->execute();
+    foreach ($fields as $field) {
+      $concat.= $this->join . '.' . $field . ',';
+    }
+    rtrim(',',$concat);
+    $concat.= ')';
+  }
+  else if (is_array($this->add)) {
+    foreach ($this->add as $field) {
+      $concat.= $this->join . '.' . $field . ',';
+    }
+    rtrim(','$concat);
+    $concat.= ')';
+  }
+  else if (is_string($this->add)) {
+    $concat = $this->join . '.' . $this->add;
+  }
+
+  switch($this->relationship) {
+    case 'o-m':
+      $this->fields.= ", GROUP_CONCAT(" . $concat . " SEPARATOR '|')";
+      $this->left = 'LEFT ';
+      break;
+    case 'm-o':
+      $this->fields.= ', ' . $concat;
+      $this->left = 'LEFT ';
+      $this->on = 'ON (' . $this->join . '.id = ' . $this->table . '.' . $this->join . '_id)';
+      break;
+    case 'm-m':
+      $this->fields.= ", GROUP_CONCAT(" . $concat . " SEPARATOR '|')";
+      $reference = implode('_',sort(array($this->table, $this->join));
+      $this->mm_join = 'LEFT JOIN ' . $reference . ' ON (' . $this->table . '.id = ' . $reference . '.' . $this->table . '_id)';
+      $this->on = 'ON (' . $this->join . '.id = ' . $reference . '.' . $this->join . '_id)'; 
+  }
+}
+
+
+
