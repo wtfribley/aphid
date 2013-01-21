@@ -28,7 +28,8 @@ class Controller {
     *   List of special tables that have their own special methods.
     */
     private $special_tables = array(
-        'index'    
+        'index',
+        'authenticate'    
     );
     
     public function __construct($request) {
@@ -46,8 +47,7 @@ class Controller {
                 
                 // CSRF protection - javascript MUST include the CSRF token with each write-type request.
                 if ($this->action == 'write') {
-                    // @todo: can I change this function to alter the object directly (i.e. by reference)? 
-                    $this->$request = Authentication::CSRF($this->request);
+                    Authentication::CSRF($this->request);
                 }
                 
                 // build and run the query.
@@ -81,7 +81,8 @@ class Controller {
             $view_query = new Query('read',array(
                 'table' => 'templates',
                 'fields' => $field,
-                'where' => array('table',$table)
+                'where' => array('`table`',$table),
+                'groupby' => 'none'
             ));          
             $view = $view_query->execute();
             
@@ -100,5 +101,9 @@ class Controller {
     
     public function index() {
         $this->results = array('index testes');    
+    }
+    
+    public function authenticate() {
+	    Authentication::user($this->request);
     }
 }

@@ -1,6 +1,8 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
 class Query {
+
+	public $type = 'read';
     
     private $table;
     
@@ -176,6 +178,7 @@ class Query {
     }
     
     private function create() {
+    	$this->type = 'write';
         $this->sql = $this->sql_templates['create'];
         
         if (!empty($this->data)) {
@@ -263,6 +266,7 @@ class Query {
     }
                                      
     private function update() {
+    	$this->type = 'write';
         $this->sql = $this->sql_templates['create'];
         
         if (!empty($this->data)) {
@@ -279,13 +283,14 @@ class Query {
     }
                                      
     private function delete() {
+    	$this->type = 'write';
         $this->sql = $this->sql_templates['delete'];    
     }
                                      
     public function execute() {
         // prepare and execute the query
         $stmt = DB::Prepare($this->parse_sql());
-        $executed = $stmt->execute($this->bindings);
+        $bool_result = $stmt->execute($this->bindings);
         
         // clean the returning data
         $data = array();
@@ -336,7 +341,7 @@ class Query {
             if ($this->single_field == true) $data = array_values($data)[0];
         }
         
-        return (empty($data)) ? $executed : $data;
+        return ($this->type == 'write') ? $bool_result : $data;
     }
     
     public function parse_sql() {

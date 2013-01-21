@@ -18,10 +18,17 @@ class Config {
         $query = new Query('read',array(
             'table' => 'config',
             'groupby' => 'none'
-        ));
+        ));     
+        $settings = $query->execute();
         
-        foreach($query->execute() as $row) {
-	    	static::$settings[$row['field']] = $row['value'];    
+        // Query::execute collapses arrays with one value, but here we need it in an enclosing array.
+        if (count($settings) == 1) $settings = array($settings);
+        
+        // do nothing if the query has returned nothing.
+        if (!empty($settings)) {
+        	foreach($settings as $row) {
+        		static::$settings[$row['field']] = $row['value'];
+        	}
         }
     }
     

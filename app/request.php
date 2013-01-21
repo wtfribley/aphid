@@ -51,7 +51,7 @@ class Request {
     *   A list of accepted options to check the query string against.
     */
     private $options_list = array(
-        'join', 'on', 'by', 'as',
+        'join', 'having', 'by', 'add', 'as',
         'fields',
         'data',
         'where',
@@ -137,29 +137,38 @@ class Request {
     }
     
     /*
+    *	create populates $this->options['data'] from the $_POST array.
+    */
+    private function create() {	    
+	    $this->options['data'] = $_POST;
+    }
+    
+    /*
     *   read populates $this->options from the $_GET array, handling relationships and the where clause.
     */
     private function read() {
         
-        $options = $_GET;
-        
-        // parse WHERE options
-        $diff = array_values(array_diff(array_keys($options),$this->options_list));        
-        // normal operation dictates that the id is included in the passed GET data.
-        if (isset($options['id'])) {
-            $options['where'] = $options['id'];
-            unset($options['id']);
-        }
-        // if it is somehow not present, we'll use the URI fragment directly.
-        else if ($this->path_info(1)) {
-            $id = $this->path_info(1);
-            $options['where'] = $id;       
-        }
-        // none of the above? if there's an unknown key in the GET array, we'll
-        //  assume that it should be used to search the database.
-        else if (count($diff) == 1) {
-            $options['where'] = array($diff[0],$_GET[$diff[0]]);
-            unset($options[$diff[0]]);
+        $options = $_GET;      
+        // an array of keys that don't match 'normal' keys defined above.
+        $diff = array_values(array_diff(array_keys($options),$this->options_list));
+                
+        // if 'where' isn't explicitly passed, we'll attempt to add it now...
+        if (!isset($options['where'])) {
+	        if (isset($options['id'])) {
+	            $options['where'] = $options['id'];
+	            unset($options['id']);
+	        }
+	        // if 'id' is somehow not present, we'll use the URI fragment directly.
+	        else if ($this->path_info(1)) {
+	            $id = $this->path_info(1);
+	            $options['where'] = $id;       
+	        }
+	        // none of the above? if there's a single unknown key in the GET array, we'll
+	        //  assume that it should be used to search the database.
+	        else if (count($diff) == 1) {
+	            $options['where'] = array($diff[0],$_GET[$diff[0]]);
+	            unset($options[$diff[0]]);
+	        }
         }
         
         if (isset($options['having'])) {
@@ -174,5 +183,60 @@ class Request {
             $this->action = 'add';
         
         $this->options = array_merge($this->options, $options);     
+    }
+    
+    /*
+    *	update populates $this->options['data'] and handles the where clause.
+    */
+    private function update() {
+		$data = json_decode(file_get_contents('php://input'), true);
+		
+		// if 'where' isn't explicitly passed, we'll attempt to add it now...
+		if (isset($data['id'])) {
+            $this->options['where'] = $data['id'];
+            unset($data['id']);
+        }
+        // using the URI fragment directly.
+        else if ($this->path_info(1)) {
+            $id = $this->path_info(1);
+            $this->options['where'] = $id;       
+        }
+        else if (!isset($data['where'])) {
+	        throw new Exception('PUT (update) request must indicate which record to update. (no id or where clause)');
+	    }
+	    else {
+		    $this->options['where'] = $data['where'];
+		    unset($data['where']);
+	    }
+		
+		$this->options['data'] = $data;  
+    }
+    
+    /*
+    *	delete handles the where clause.
+    */
+    private function delete() {
+    	$where = json_decode(file_get_contents('php://input'), true);
+    
+	 	// if 'where' isn't explicitly passed, we'll attempt to add it now...
+		if (isset($where['id'])) {
+            $this->options['where'] = $where['id'];
+            unset($data['id']);
+        }
+        // $where = array('where'=>x) - user should've simply passed an int instead.
+        else if (is_numeric(current($where))) {
+	        $this->options['where'] = current($where);
+        }
+        // using the URI fragment directly.
+        else if ($this->path_info(1)) {
+            $id = $this->path_info(1);
+            $this->options['where'] = $id;       
+        }
+        else if (!isset($where)) {
+	        throw new Exception('DELETE request must indicate which record to delete. (no id or where clause)');
+	    }
+	    else {
+		    $this->options['where'] = $where;
+	    }    
     }
 }

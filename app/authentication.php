@@ -44,8 +44,7 @@ class Authentication {
 		
 		// if there is a recognized user, get their authentication level
 		if (Session::get('user')) {
-			$query = new Query(array(
-				'type' => 'read',
+			$query = new Query('read',array(
 				'table' => 'users',
 				'fields' => 'auth_level',
                 // users are bound to a session id that is regenerated for each request.
@@ -64,8 +63,7 @@ class Authentication {
             
             // now that we've authenticated the user, we can update their sess_id.
             //  note: after this (i.e. in templates) simply use session_id() to retrieve user data.
-            $query = new Query(array(
-                'type' => 'update',
+            $query = new Query('update',array(
                 'table' => 'users',
                 'data' => array('sess_id'=>$request->session('id')),
                 'where' => array('sess_id',$request->session('last_id'))
@@ -105,14 +103,26 @@ class Authentication {
      *  @param Request $request - passed by reference, modifies the request object.
      */
     public static function CSRF($request) {
-        if (!isset($request->options['data']['csrf']) || ($request->data('csrf') != $request->session('csrf'))) {
+    	$csrf_user = $request->options('data')['csrf'];
+    
+        if (!isset($csrf_user) || ($csrf_user != $request->session('csrf'))) {
             Error::page('401', $request);                  
         }
         // we have to unset the csrf element so it doesn't try to use it in subsequent queries.
-        else if (isset($request->options['data']['csrf']) && ($request->data('csrf') == $request->session('csrf')))
+        else if (isset($csrf_user) && ($csrf_user == $request->session('csrf')))
             unset($request->options['data']['csrf']);
             
         return $request;
+    }
+    
+    public static function user($request) {
+		static::CSRF($request);
+		
+		$credentials = $request->options('data');
+		
+		// @todo: USER AUTHENTICATION!!
+		$testing = print_r($credentials, true);
+		Log::write('Authentication::user creds',$testing);    
     }
     
     /*

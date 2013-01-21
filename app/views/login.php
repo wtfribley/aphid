@@ -1,14 +1,22 @@
-<!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="utf-8">
-		<title>Login</title>
-	</head>
+<?php
+	$title = 'Aphid Login';
+	$scripts = array('jquery','/app/views/assets/js/aphid.js');	
+	include 'includes/header.php';
+?>
+	<section class="main">		
+		<form class="span4 offset4" method="post" action="/authenticate">
+			<fieldset class="align-center">
+				<legend>Log In</legend>
+				<div class="control-group" style="margin-bottom: 25px">
+					<input type="text" name="username" placeholder="Username" required>
+					<input type="password" name="password" placeholder="Password" required>
+					<input type="hidden" name="csrf" value="<?= $this->controller->results['csrf']; ?>">
+				</div>
+				<button type="submit" class="btn btn-success" disabled>Log In</button>
+			</fieldset>
+		</form>
+	</section>
 	
-<body>
-	<h1>Please Log In!</h1>
-	
-	<h3>A form will go here</h3>
-	<p>And <strong>stuff</strong> will go here too.</p>
-</body>
-</html>
+<?php
+	include 'includes/footer.php';
+?>
