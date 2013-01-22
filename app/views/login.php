@@ -4,7 +4,7 @@
 	include 'includes/header.php';
 ?>
 	<section class="main">		
-		<form class="span4 offset4" method="post" action="/authenticate">
+		<form id="login_form" class="span4 offset4" method="post" action="/authenticate">
 			<fieldset class="align-center">
 				<legend>Log In</legend>
 				<div class="control-group" style="margin-bottom: 25px">

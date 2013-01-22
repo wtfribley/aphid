@@ -13,6 +13,7 @@ Autoloader::map(array(
     'DB' => PATH . 'app/db.php',
     'Error' => PATH . 'app/error.php',
     'Log' => PATH . 'app/log.php',
+    'PasswordHash' => PATH . 'app/lib/PasswordHash.php',
     'Query' => PATH . 'app/query.php',
     'Request' => PATH . 'app/request.php',
     'Response' => PATH . 'app/response.php'
@@ -59,7 +60,7 @@ date_default_timezone_set(Config::get('timezone','America/Los_Angeles'));
 // setting to 'console' will simply log output, rather than echo anything to the browser.
 //		(note: this setting will not be saved - it must be hardcoded here)
 //Config::set('env','console');
-
+ 
 
 /*
  *      Run Aphid - Follow the Request Object...
@@ -85,4 +86,9 @@ $response->send();
 function aphid_shutdown() {
  	// Save any changes made to the config settings.
  	Config::save();
+ 	
+ 	// Save the current referring URL in case we need to redirect to it next...
+ 	$s = empty($_SERVER["HTTPS"]) ? '' : ($_SERVER["HTTPS"] == "on") ? "s" : "";
+ 	$url = 'http' . $s . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']; 	
+ 	Session::set('referrer',$url);
 }

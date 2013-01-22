@@ -15,7 +15,7 @@ class Authentication {
 	 *		- Third digit is the level required to read/write data.
      *      - Fourth digit indicates the level required to be allowed to log in.
 	 *		 
-	 *	@var array $permissions
+	 *	@var string $permissions
 	 */
 	private $permissions;
 	
@@ -50,9 +50,11 @@ class Authentication {
                 // users are bound to a session id that is regenerated for each request.
                 //  we use the LAST session id to get the user.
                 //  (the user's sess_id is updated with the regenerated id on shutdown)
-				'where' => array('sess_id',$request->session('last_id'))
+				'where' => array('sess_id',$request->session('last_id')),
+				'groupby'=>'none'
 			));
             $user_auth_level = $query->execute();
+            
             // this means something fishy is going on.
             //  session says user is logged in, but their id doesn't match any known user.
             if (empty($user_auth_level)) {
@@ -116,13 +118,50 @@ class Authentication {
     }
     
     public static function user($request) {
-		static::CSRF($request);
+		static::CSRF($request);		
+		$user_credentials = $request->options('data');		
 		
-		$credentials = $request->options('data');
+		$user_query = new Query('read',array(
+			'table'=>'users',
+			'fields'=>array('username','hash'),
+			'where'=>array('username',$user_credentials['username']),
+			'groupby'=>'none'
+		));
+		$stored_credentials = $user_query->execute();
 		
-		// @todo: USER AUTHENTICATION!!
-		$testing = print_r($credentials, true);
-		Log::write('Authentication::user creds',$testing);    
+		// supplied username matches no database records
+		if (empty($stored_credentials)) return 'Incorrect Username';
+		
+		// verify incoming password against stored hash using PasswordHash.		
+		else {
+			$hasher = static::hasher();
+			
+			if ($hasher->CheckPassword($user_credentials['password'], $stored_credentials['hash'])) {
+				
+				// a user is logged in if they have a valid session id AND $_SESSION['user'] == true.
+				$update_user = new Query('update',array(
+					'table'=>'users',
+					'data'=>array('sess_id'=>$request->session('id')),
+					'where'=>array('username',$user_credentials['username'])
+				));
+				$update_user->execute();
+				Session::set('user',true);
+								
+				return true;
+			}
+			else return 'Incorrect Password';	
+		}
+    }
+    
+    /*
+    *	Return the PasswordHash class.
+    */
+    private static function hasher() {
+        // Hashing config variables.
+        $hash_cost_log2 = 12;
+        $hash_portable = false;      
+        
+        return new PasswordHash($hash_cost_log2, $hash_portable);
     }
     
     /*

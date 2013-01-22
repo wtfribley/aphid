@@ -167,10 +167,14 @@ class Query {
         else $this->groupby = 'GROUP BY ' . $this->table . '.' . $groupby;
     }
     
+    /**
+     *	This binds incoming data for use in a prepared PDOStatement
+     *		Note: arrays are stringified using JSON, instead of normal PHP serialize.
+     */
     public function data($data) {
-        // serialize arrays    
+        // json encode arrays    
         foreach($data as $k => $v) {
-            if(is_array($v)) $data[$k] = serialize($v);
+            if(is_array($v)) $data[$k] = json_encode($v);
         }
         
         $this->data = array_keys($data);
@@ -267,7 +271,7 @@ class Query {
                                      
     private function update() {
     	$this->type = 'write';
-        $this->sql = $this->sql_templates['create'];
+        $this->sql = $this->sql_templates['update'];
         
         if (!empty($this->data)) {
             $sql = 'SET ';

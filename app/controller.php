@@ -29,7 +29,8 @@ class Controller {
     */
     private $special_tables = array(
         'index',
-        'authenticate'    
+        'authenticate',
+        'logout'    
     );
     
     public function __construct($request) {
@@ -104,6 +105,17 @@ class Controller {
     }
     
     public function authenticate() {
-	    Authentication::user($this->request);
+	    $auth = Authentication::user($this->request);
+	    
+	    if ($auth === true) {
+	    	header('Location: ' . Session::get('referrer'));
+	    	exit(0);
+	    }
+    }
+    
+    public function logout() {
+	    Session::set('user',false);
+	    header('Location: ' . Session::get('referrer'));
+	    exit(0);
     }
 }
