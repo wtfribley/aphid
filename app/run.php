@@ -8,6 +8,7 @@ require PATH . 'app/autoloader.php';
 
 // we can map known classes for faster loading
 Autoloader::map(array(
+    'Authentication' => PATH . 'app/authentication.php',
     'Config' => PATH . 'app/config.php',
     'Controller' => PATH . 'app/controller.php',
     'DB' => PATH . 'app/db.php',
@@ -16,12 +17,15 @@ Autoloader::map(array(
     'PasswordHash' => PATH . 'app/lib/PasswordHash.php',
     'Query' => PATH . 'app/query.php',
     'Request' => PATH . 'app/request.php',
-    'Response' => PATH . 'app/response.php'
+    'Response' => PATH . 'app/response.php',
+    'Session' => PATH . 'app/session.php',
+    'User' => PATH . 'app/user.php'
 ));
 
 // Set the directory(-ies) in which we'll keep our classes
 Autoloader::directory(array(
-    PATH . 'app/'
+    PATH . 'app/',
+    PATH . 'lib/'
 ));
 
 // Register the Autoloader
@@ -68,13 +72,13 @@ date_default_timezone_set(Config::get('timezone','America/Los_Angeles'));
 
 $request = new Request();
 
-// create a new authentication object...
-$authenticated = new Authentication($request);
+// Create a new User for this request (will load current user if there is one)
+$user = new User($request);
 
-// ...and pass it to the controller.
-$controller = new Controller($authenticated->request());
+// ...and pass them to the Controller.
+$controller = new Controller($user, $request);
 
-// create a response and send it where it needs to go.
+// create a Response and send it where it needs to go.
 $response = new Response($controller);
 $response->send();
 

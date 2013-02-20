@@ -28,16 +28,6 @@ class Request {
     public $session;
     
     /*
-    *   Which actions are allowed - these defaults are overwritten by Authentication.
-    */
-    public $allow = array(
-        'view' => true,
-        'read' => true,
-        'write' => true,
-        'login' => true
-    );
-    
-    /*
     *   Mapping of request methods to CRUD.
     */
     private $crud_map = array(
@@ -86,8 +76,7 @@ class Request {
         
         // save the requested table name.
         //  (options needs this as well, to be passed to Query)
-        $this->table = $this->path_info(0,'index');
-        $this->options['table'] = $this->table;
+        $this->table = $this->options['table'] = $this->path_info(0,'index');
         
         // save the request method (GET, POST, PUT, DELETE) as a CRUD action.
         //  (options needs this as well, to be passed to Query)
@@ -123,13 +112,9 @@ class Request {
             return Session::get($key, $default);
     }
     
-    public function allow($action) {
-        return $this->allow[$action];    
-    }
-    
     public function path_info($i = false, $default = false) {
         if ($i !== false) {
-            if (isset($this->path_info[$i]))
+            if (isset($this->path_info[$i]) && $this->path_info[$i] != '')
                 return preg_replace('/\?(?!.*\?)\S+/', '', $this->path_info[$i]);
             else return $default;
         }

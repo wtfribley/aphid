@@ -73,7 +73,7 @@ class Query {
      *  $options['where']: an array in the form (field,value) OR (field,operator,value) 
      *      - can also be an integer, in which case 'id' is assumed for the field and '=' for the operator.
      *    
-     *  $options['orderly']: the field in which to order descending OR an array in the form (field, order).
+     *  $options['orderby']: the field in which to order descending OR an array in the form (field, order).
      *    
      *  $options['limit']: an integer to limit the resulting rows OR an array in the form (limit, offset).
      *    
@@ -236,8 +236,9 @@ class Query {
                 $this->sql = str_replace('[OPTIONS]',$this->sql_templates['join'],$this->sql_templates['read']);
                 $this->left = 'LEFT ';
                 $reference = array($this->table, $this->join);
-                implode('_',sort($reference));
-                $this->where[0] = '`' . $reference . '.' . $this->join . '_id`';
+                sort($reference);
+                $reference = implode('_',$reference);
+                $this->where[0] = $reference . '.' . $this->join . '_id';
                 $this->join = $reference;
                 break;
         }

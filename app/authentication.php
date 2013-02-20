@@ -1,104 +1,6 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
 class Authentication {
-	
-	/**
-	 *	The incoming request object goes here - to be altered during authentication.
-	 *	@var Request $request
-	 */
-	public $request;
-	
-	/**
-	 *	The permissions code for this request.
-	 *		- First digit is the authentication level required to view the associated template.
-	 *		- Second digit is the level required to read data.
-	 *		- Third digit is the level required to read/write data.
-     *      - Fourth digit indicates the level required to be allowed to log in.
-	 *		 
-	 *	@var string $permissions
-	 */
-	private $permissions;
-	
-	/**
-	 *	The authentication level of the current user.
-	 *		- 0 is no authentication (i.e. visitor)
-	 *		- 1 is user
-	 *		- 2 is admin
-     *
-     *  @var string $user_auth_level
-	 */
-	private $user_auth_level = '0';
-	
-    /**
-     *  Authenticate a new Request
-     *  @param Request $request
-     */
-	public function __construct($request) {
-		$this->request = $request;
-		
-		// get the permissions we're interested in - default is everything public
-		$permissions = Config::get('permissions');
-		if (isset($permissions[$request->table]))
-			$this->permissions = $permissions[$request->table];
-		else $this->permissions = '0000';
-		
-		// if there is a recognized user, get their authentication level
-		if (Session::get('user')) {
-			$query = new Query('read',array(
-				'table' => 'users',
-				'fields' => 'auth_level',
-                // users are bound to a session id that is regenerated for each request.
-                //  we use the LAST session id to get the user.
-                //  (the user's sess_id is updated with the regenerated id on shutdown)
-				'where' => array('sess_id',$request->session('last_id')),
-				'groupby'=>'none'
-			));
-            $user_auth_level = $query->execute();
-            
-            // this means something fishy is going on.
-            //  session says user is logged in, but their id doesn't match any known user.
-            if (empty($user_auth_level)) {
-                Error::page('401',$request);
-            }
-            
-            $this->user_auth_level = $user_auth_level;
-            
-            // now that we've authenticated the user, we can update their sess_id.
-            //  note: after this (i.e. in templates) simply use session_id() to retrieve user data.
-            $query = new Query('update',array(
-                'table' => 'users',
-                'data' => array('sess_id'=>$request->session('id')),
-                'where' => array('sess_id',$request->session('last_id'))
-            ));
-            $query->execute();              
-		}
-		
-		// set our allowed actions
-        $this->request->allow['view'] = ($this->user_auth_level >= $this->permissions[0]);
-        $this->request->allow['read'] = ($this->user_auth_level >= $this->permissions[1]);
-        $this->request->allow['write'] = ($this->user_auth_level >= $this->permissions[2]);
-        $this->request->allow['login'] = ($this->user_auth_level >= $this->permissions[3]);       
-	}
-    
-    /**
-     *  Simply return the (now-altered) request object.
-     */
-    public function request() {
-		return $this->request;
-	}
-    
-    /**
-     *  Set a table's permissions code - this resides in Config, which will save to the DB.
-     *      (see the docs for $permissions in this class for an explanation of the codes)
-     *
-     *  @param string $table
-     *  @param string $code - the 4-digit permissions code.
-     */
-    public static function set($table, $code) {
-        $permissions = Config::get('permissions');
-        $permissions[$table] = $code;
-        Config::set('permissions');
-    }
     
     /**
      *  Compare data in the request to current session value to prevent CSRF.
@@ -117,46 +19,10 @@ class Authentication {
         return $request;
     }
     
-    public static function user($request) {
-		static::CSRF($request);		
-		$user_credentials = $request->options('data');		
-		
-		$user_query = new Query('read',array(
-			'table'=>'users',
-			'fields'=>array('username','hash'),
-			'where'=>array('username',$user_credentials['username']),
-			'groupby'=>'none'
-		));
-		$stored_credentials = $user_query->execute();
-		
-		// supplied username matches no database records
-		if (empty($stored_credentials)) return 'Incorrect Username';
-		
-		// verify incoming password against stored hash using PasswordHash.		
-		else {
-			$hasher = static::hasher();
-			
-			if ($hasher->CheckPassword($user_credentials['password'], $stored_credentials['hash'])) {
-				
-				// a user is logged in if they have a valid session id AND $_SESSION['user'] == true.
-				$update_user = new Query('update',array(
-					'table'=>'users',
-					'data'=>array('sess_id'=>$request->session('id')),
-					'where'=>array('username',$user_credentials['username'])
-				));
-				$update_user->execute();
-				Session::set('user',true);
-								
-				return true;
-			}
-			else return 'Incorrect Password';	
-		}
-    }
-    
     /*
     *	Return the PasswordHash class.
     */
-    private static function hasher() {
+    public static function hasher() {
         // Hashing config variables.
         $hash_cost_log2 = 12;
         $hash_portable = false;      

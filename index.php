@@ -17,6 +17,6 @@ define("PRIVATE", true);
 
 // Bootstrap
 
-require PATH . 'app/bootstrap.php';
+require PATH . 'app/run.php';
 
 ?>

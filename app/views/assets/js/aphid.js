@@ -38,9 +38,6 @@ $.fn.aphidVerticalCenter = function(parent_el) {
 		margin = (parent_height-this_height)/4;
 		
 	$(this).css('margin-top',margin);
-		
-	console.log('this_height: '+this_height);
-	console.log('parent_height: '+parent_height);
 }
 
 $('#login_form').aphidVerticalCenter($('.wrapper'));

@@ -16,6 +16,11 @@ class Controller {
     *   Holds the current request object.
     */
     public $request;
+
+    /*
+    *   Holds the current user object.
+    */
+    public $user;
     
     /*
     *   The action to perform - either read or write.
@@ -33,20 +38,21 @@ class Controller {
         'logout'    
     );
     
-    public function __construct($request) {
+    public function __construct($user, $request) {
+        $this->user = $user;
         $this->request = $request;
         $table = $request->get('table');        
         $this->action = ($request->test('action',array('read','having','by','add'))) ? 'read' : 'write';
-        
+
         // tables listed in the special_tables array run corresponding methods
         if (in_array($table, $this->special_tables)) {
             $this->$table();    
         }
         else {       
-            // are we allowed to do the action requested?
-            if ($this->request->allow($this->action)) {
+            // are we allowed to do the action requested (either read or write)?
+            if ($user->hasPermission($table, $this->action)) {
                 
-                // CSRF protection - javascript MUST include the CSRF token with each write-type request.
+                // CSRF protection - the CSRF token MUST be included with each write-type request.
                 if ($this->action == 'write') {
                     Authentication::CSRF($this->request);
                 }
@@ -69,11 +75,12 @@ class Controller {
         if ($this->request->test('format','html')) {
             
             // set the table to login if it's allowed
-            if (!$this->request->allow('view') && $this->request->allow('login')) $table = 'login';
-            
+            if (!$user->hasPermission($table, 'view') && $user->hasPermission($table, 'login')) {
+                $table = 'login';
+            }
             // if we can't login, we have to show access denied.
-            if (!$this->request->allow('view') && !$this->request->allow('login')) {
-                Error:page('403', $this->request);        
+            else if (!$user->hasPermission($table, 'view') && !$user->hasPermission($table, 'login')) {
+                Error::page('403', $this->request);        
             }
             
             // view is allowed OR we're going to login
@@ -93,7 +100,7 @@ class Controller {
         }
         
         // a new CSRF token is generated with each request.
-        //  it's up to javascript to include this token with write-type requests.
+        //  it's up to the client to include this token with write-type requests.
         $csrf = Authentication::getToken();
         Session::set('csrf',$csrf);
         if (!is_array($this->results)) $this->results = array($this->results);
@@ -101,20 +108,23 @@ class Controller {
     }
     
     public function index() {
-        $this->results = array('index testes');    
+        header('Location: /admin');    
     }
     
     public function authenticate() {
-	    $auth = Authentication::user($this->request);
+        $user_credentials = $this->request->options('data');
+
+	    $logged_in = $this->user->login($user_credentials['username'],$user_credentials['password']);
 	    
-	    if ($auth === true) {
+	    if ($logged_in === true) {
 	    	header('Location: ' . Session::get('referrer'));
 	    	exit(0);
 	    }
     }
     
     public function logout() {
-	    Session::set('user',false);
+        $this->user->logout();
+
 	    header('Location: ' . Session::get('referrer'));
 	    exit(0);
     }
