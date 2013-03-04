@@ -18,10 +18,15 @@ class DB {
             
         return static::$dbh->prepare($sql);
     }
+
+    public static function lastId() {
+        if(is_null(static::$dbh)) return false;
+        else return static::$dbh->lastInsertId();
+    }
     
     private static function connect() {
         
-        static::$db_config = Config::get('db');
+        static::$db_config = Config::get('database');
         
         $dbname = static::$db_config['name'];
         $host = static::$db_config['host'];

@@ -4,42 +4,32 @@
 
 class Session {
 
-    /**
-     *  Store the session's CURRENT id.
-     *  @var string $id
-     */
-    public $id;
-    
-    /**
-     *  Store the session's PREVIOUS id.
-     *      This is used to identify a user, as it is this value that will be in storage.
-     *  @var string $id
-     */
-    public $last_id;
-    
-    /**
-     *  The CSRF token that any write-type request must match.
-     *  @var string $csrf
-     */
-    public $csrf = null;
-    
-    public function __construct() {
+    public static function start() {
+
         // start the session, store the old id.
         session_start();
-        $this->last_id = session_id();
-        // get the csrf token if it exists - this is for convenience more than anything else.
-        if (isset($_SESSION['csrf'])) $this->csrf = $_SESSION['csrf'];
         // for your safety!
         session_regenerate_id();
-        $this->id = session_id();
     }
     
-    public static function get($key, $default = false) {
+    public static function get($key = null, $default = false) {
+        if (is_null($key)) return $_SESSION;
+
         if (isset($_SESSION[$key])) return $_SESSION[$key];
         else return $default;
     }
     
     public static function set($key, $value) {
         $_SESSION[$key] = $value;    
+    }
+
+    public static function destroy($key = null) {
+        if (is_null($key)) {
+            $_SESSION = null;
+            session_destroy();
+        }
+        else {
+            if (isset($_SESSION[$key])) unset($_SESSION[$key]);
+        }
     }
 }

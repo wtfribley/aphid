@@ -1,3 +1,26 @@
+/**============================
+==		Aphid Main App	
+============================**/
+
+(function(){
+
+	// save reference to window
+	var root = this;
+
+	var Aphid;
+	Aphid = root.Aphid = {};
+
+	// jQuery owns the $
+	Aphid.$ = root.jQuery;
+
+}).call(this);
+
+
+/**============================
+==		Aphid jQuery Plugins	
+============================**/
+
+
 /**
  *	Forms - relies on HTML5 browser functionality.
  */
@@ -24,8 +47,51 @@ $.fn.aphidForms = function() {
 			$('[type="submit"]').attr('disabled',true);	
 		}
 	});
-	
+
+	/*
+	*	AJAX
+	*/
+
+	$ajax_forms = $('form[data-ajax-action]');
+
+	$ajax_forms.on('submit', function(e) {
+		e.preventDefault();
+		
+		var data = $(this).aphidSerializeForm();
+
+		$.ajax({
+			type: 'POST',
+			url: $(this).attr('data-ajax-action'),
+			dataType: 'json',
+			data: data,
+			success: function(response) {
+				console.log(response);
+			}
+		});
+
+		// some forms clear on submit
+		if ($(this).is('[data-aphid-clear-on-submit]'))
+			$(this).find('input, textarea').val('').trigger('keyup');
+	});
 };
+
+$.fn.aphidSerializeForm = function() {
+	var o = {};
+    var a = this.serializeArray();
+
+    // handle comma lists
+	$(this).find('[data-aphid-comma-list]').each(function(i,el) {
+		var arr = $(el).val().split(',');
+		o[$(el).attr('name')] = arr;
+	});
+
+    $.each(a, function() {
+        if (o[this.name] === undefined) {
+            o[this.name] = this.value || '';
+        }
+    });
+    return o;
+}
 
 $(document).aphidForms();
 

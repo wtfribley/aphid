@@ -19,13 +19,15 @@ Autoloader::map(array(
     'Request' => PATH . 'app/request.php',
     'Response' => PATH . 'app/response.php',
     'Session' => PATH . 'app/session.php',
+    'URI'   => PATH . 'app/uri.php',
     'User' => PATH . 'app/user.php'
 ));
 
 // Set the directory(-ies) in which we'll keep our classes
 Autoloader::directory(array(
     PATH . 'app/',
-    PATH . 'lib/'
+    PATH . 'lib/',
+    PATH . 'app/controllers/'
 ));
 
 // Register the Autoloader
@@ -64,24 +66,22 @@ date_default_timezone_set(Config::get('timezone','America/Los_Angeles'));
 // setting to 'console' will simply log output, rather than echo anything to the browser.
 //		(note: this setting will not be saved - it must be hardcoded here)
 //Config::set('env','console');
- 
 
 /*
  *      Run Aphid - Follow the Request Object...
  */
 
+// start the Session.
+Session::start();
+
+// gather all incoming data.
 $request = new Request();
 
-// Create a new User for this request (will load current user if there is one)
-$user = new User($request);
+// authorize the request - user-based and a CSRF check.
+$request->authorize();
 
-// ...and pass them to the Controller.
-$controller = new Controller($user, $request);
-
-// create a Response and send it where it needs to go.
-$response = new Response($controller);
-$response->send();
-
+// process request, query DB, generate response.
+$controller = new Controller($request);
 
 /*
  *		Run all of our shutdown functions.

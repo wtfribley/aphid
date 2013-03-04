@@ -2,134 +2,154 @@
 
 class User {
 
-	public $is_authenticated = false;
+	public $data = array();
 
-	public $permissions = array();
+	public $groups = array();
 
-	public $last_login = 0;
+	public function __construct($user_id = false) {
 
-	public $first_login = 0;
+		// we have a recognized user.
+		if ($user_id) {	// this should evaluate to false if $user_id == 0 as well.
 
-	/**
-	*	Constructing a User takes the previous request's session id
-	*		(available as 'last_id')
-	*	and uses it to query the `users` table. Based on that result
-	*	we get a list of permissions for that user.
-	*
-	*	If no user is found, we set permissions to false - this is
-	*	the "Anonymous User" state.
-	**/
+			// get User by session id.
+			$query = new Query('read', array(
+				'table' 	=> 'users',
+				'where' 	=> $user_id,
+				'groupby'	=> 'none'
+			));
+	        $this->data = $query->execute();
+	    }
+	    // we have no user id - the user is anonymous.
+	    else {
+	    	$this->data['id'] = 0;
+	    }
 
-	public function __construct($request) {
-
-		$query = new Query('read', array(
-			'table' => 'users',
-            // users are bound to a session id that is regenerated for each request.
-            //  we use the LAST session id to get the user.
-            //  (the user's sess_id is updated with the regenerated id on shutdown)
-			'where' => array('sess_id',$request->session('last_id')),
-			'groupby'=>'none'
-		));
-        $user = $query->execute();
-
-        if (empty($user)) {
-        	// User is Anonymous
-        	$user['id'] = 1;
-        	$user['is_superuser'] = 0;
-        }
-        else {
-        	// User is already authenticated.
-    		$this->is_authenticated = true;
-        }
-
-    	if ($user['is_superuser'] === 1) {
-    		$this->permissions = true;
-    	}
-    	else {
-        	// All Users belong to at least one Group (the "other" group, by default)
-        	//	Permissions are contained in groups.
-        	$query = new Query('by', array(
-        		'table'	=>	'groups',
-        		'join'	=>	'users',
-        		'relationship'	=>	'm-m',
-        		'fields'=>	'permissions',
-        		'where'	=>	$user['id']
-        	));
-        	$permissions = $query->execute();
-
-        	foreach($permissions as $permission) {
-        		if (!isset($this->permissions[$permission[0]]))
-        			$this->permissions[$permission[0]] = array($permission[1]);
-        		else $this->permissions[$permission[0]][] = $permission[1];
-        	}
-    	}
-
-    	// now that we've authenticated the user, we can update their sess_id.
-        //  note: after this (i.e. in templates) simply use session_id() to retrieve user data.
-        $query = new Query('update',array(
-            'table'	=> 'users',
-            'data'	=> array('sess_id'=>$request->session('id')),
-            'where' => array('sess_id',$request->session('last_id'))
-        ));
-        $query->execute();
+	    // get all Groups to which this user belongs.
+	    //	Groups contain permissions.
+	    $this->get_groups();
 	}
 
-	public function hasPermission($table, $permission, $default = false) {
-		if ($this->permissions === true) return true;
-		else if ($this->permissions === false) return $default;
-		else if (isset($this->permissions[$table]) && in_array($permission, $this->permissions[$table])) return true;
+	public function get($field, $default = false) {
+		if (isset($this->data[$field])) return $this->data[$field];
 		else return $default;
 	}
 
-	public function login($username, $password, $username_failed = 'Incorrect Username', $password_failed = 'Incorrect Password') {
+	/**
+	 *	Check if this User has a particular Permission on a particular Model.
+	 *
+	 *		Note: Allow supercedes Deny - if one group has permission, that takes
+	 *		precedence over any other group that may not have permission.
+	 */
+	public function has_permission($model, $permission, $default = false) {
 
-		// If we're already authenticated, can't login again...
-		if ($this->is_authenticated) {
-				return true;
-		}
-		else {
-			// Get User by username
-			$user_query = new Query('read',array(
-				'table'=>'users',
-				'fields'=>array('id','hash'),
-				'where'=>array('username',$username),
-				'groupby'=>'none'
-			));
-			$user = $user_query->execute();
-			
-			// supplied username matches no database records
-			if (empty($user)) return $username_failed;
-
-			// verify incoming password against stored hash using PasswordHash.		
+		// iterate through all Groups to check their associated Permissions.
+		for ($i=0;$i<count($this->groups);$i++) {
+			if (isset($this->groups[$i]['permissions']))
+				$grp_perms = $this->groups[$i]['permissions'];
 			else {
-				$hasher = Authentication::hasher();
-				
-				if ($hasher->CheckPassword($password, $user['hash'])) {
-					
-					// A User is logged in if their sess_id is set to the current session id.
-
-					$this->last_login = time();
-
-					$update_user = new Query('update',array(
-						'table'	=>	'users',
-						'data'	=>	array('sess_id'=>session_id(),'last_login'=>$this->last_login),
-						'where'	=>	$user['id']
-					));
-					$update_user->execute();
-					
-					// everything checks out!				
-					return true;
-				}
-				// incoming password doesn't match stored hash
-				else return $password_failed;	
+				$response = new Response(500, array(
+					'error'	=>	'Group permissions not found',
+					'groups'=>	$this->groups
+				), 'html', '500');
 			}
+
+			// each group contains an array of permissions - which are themselves arrays.
+			// we'll construct an array, then search the group's permissions for that array.
+			//		Note: we return true out of the loop on the first found permission - this means
+			//		that Allow supercedes Deny. This could be easily amended to switch that prioritization.
+			$needle = array($model, $permission);
+			if (in_array($needle, $grp_perms)) return true;
+		}
+
+		return false;
+	}
+
+	public function login($username, $password) {
+
+		// get user by username.
+		$query = new Query('read', array(
+			'table'=>'users',
+			'where'=>array('username',$username),
+			'groupby'=>'none'
+		));
+		$user = $query->execute();
+
+		// no results mean a bad username
+		if (empty($user)) {
+			return array('error'=>'username failed','username'=>$username);
+		}
+
+		// check the retrieved hash against the supplied password.
+		else {
+			$hasher = Authentication::hasher();
+			
+			if ($hasher->CheckPassword($password, $user['hash'])) {
+
+				// Set the user_id session variable - future requests will
+				// look for this value to find the current user.
+				Session::set('user_id',$user['id']);
+
+				// Assign the User to this instance, update the database.
+				$this->data = $user;
+				$this->data['last_login'] = time();
+
+				$update_user = new Query('update',array(
+					'table'	=>	'users',
+					'data'	=>	$this->data,
+					'where'	=>	$user['id']
+				));
+				$update_user->execute();
+
+				// get the Groups associated with our new User.
+				$this->get_groups();
+
+				return true;
+			}
+			// the password does not validate against the stored hash.
+			else return array('error'=>'password failed');
 		}
 	}
 
 	public function logout() {
-		// Regenerating the session id will throw the user out of sync with the
-        //  session id - the next request won't be able to find a known user as
-        //  their stored session id won't match.
-        session_regenerate_id();
+		// a logged-in user is identified by the 'user_id' session value.
+		//	...destroy it.
+		Session::destroy('user_id');
+	}
+
+	public function add_to_group($group) {
+
+		// retrieve the Group's id.
+		$query = new Query('read', array(
+			'table'	=>	'groups',
+			'fields'=>	'id',
+			'where'	=>	array('name', $group)
+		));
+		$group_id = $query->execute();
+
+		// insert record into the reference table groups_users
+		$query = new Query('create', array(
+			'table'	=>	'groups_users',
+			'data'	=>	array('users_id'=>$this->data['id'],'groups_id'=>$group_id)
+		));
+		$query->execute();
+	}
+
+	private function get_groups() {
+
+		// get Groups by user id
+		$query = new Query('by', array(
+    		'table'	=>	'groups',
+    		'join'	=>	'users',
+    		'relationship'	=>	'm-m',
+    		'fields'=>	array('name','permissions'),
+    		'where'	=>	$this->data['id']
+    	));
+    	$groups = $query->execute();
+    	
+    	// simple check to see if we've returned one group (which will have named keys)
+    	//	or an array of groups (which will have numerical keys).
+    	if (!isset($groups[0])) $groups = array($groups);
+    	
+    	$this->groups = $groups;
 	}
 }

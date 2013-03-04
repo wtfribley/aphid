@@ -182,7 +182,7 @@ class Query {
     }
     
     private function create() {
-    	$this->type = 'write';
+    	$this->type = 'create';
         $this->sql = $this->sql_templates['create'];
         
         if (!empty($this->data)) {
@@ -271,7 +271,7 @@ class Query {
     }
                                      
     private function update() {
-    	$this->type = 'write';
+    	$this->type = 'update';
         $this->sql = $this->sql_templates['update'];
         
         if (!empty($this->data)) {
@@ -288,14 +288,14 @@ class Query {
     }
                                      
     private function delete() {
-    	$this->type = 'write';
+    	$this->type = 'delete';
         $this->sql = $this->sql_templates['delete'];    
     }
                                      
     public function execute() {
         // prepare and execute the query
         $stmt = DB::Prepare($this->parse_sql());
-        $bool_result = $stmt->execute($this->bindings);
+        $stmt->execute($this->bindings);
         
         // clean the returning data
         $data = array();
@@ -346,7 +346,12 @@ class Query {
             if ($this->single_field == true) $data = array_values($data)[0];
         }
         
-        return ($this->type == 'write') ? $bool_result : $data;
+        // write-type requests simply return the number of rows affected.
+        if (in_array($this->type, array('create','update','delete'))) {
+            ($stmt->rowCount() > 0) ? $data = $stmt->rowCount() : $data = false;
+        }
+
+        return $data;
     }
     
     public function parse_sql() {
@@ -390,9 +395,10 @@ class Query {
             $this->groupby,
             $this->data
         );
-                
+
         // do replacement, then strip extra white space
-        return trim(preg_replace('/\s\s+/',' ',str_replace($search, $replace, $this->sql))) . ';';
+        $this->sql = trim(preg_replace('/\s\s+/',' ',str_replace($search, $replace, $this->sql))) . ';';
+        return $this->sql;
     }
                                      
     private function concat() {

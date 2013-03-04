@@ -10,7 +10,8 @@
 				<div class="control-group" style="margin-bottom: 25px">
 					<input type="text" name="username" placeholder="Username" required>
 					<input type="password" name="password" placeholder="Password" required>
-					<input type="hidden" name="csrf" value="<?= $this->controller->results['csrf']; ?>">
+					<input type="hidden" name="csrf" value="<?= $data['csrf']; ?>">
+					<input type="hidden" name="redirect" value="group">
 				</div>
 				<button type="submit" class="btn btn-success" disabled>Log In</button>
 			</fieldset>

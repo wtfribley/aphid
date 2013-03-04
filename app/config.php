@@ -1,98 +1,98 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
 class Config {
-    
-    /**
-     *  Holds the application's settings.
-     *  @var array $settings
-     */
-    private static $settings = array();       
-    
-    /**
-     *  Loads settings from the DB - called during bootstrap.
-     */
-    public static function load() {
-    
-    	static::loadDB();
-        
-        $query = new Query('read',array(
-            'table' => 'config',
-            'groupby' => 'none'
-        ));     
-        $settings = $query->execute();
-        
-        // Query::execute collapses arrays with one value, but here we need it in an enclosing array.
-        if (count($settings) == 1) $settings = array($settings);
-        
-        // do nothing if the query has returned nothing.
-        if (!empty($settings)) {
-        	foreach($settings as $row) {
-        		static::$settings[$row['field']] = $row['value'];
-        	}
-        }
-    }
-    
-    /**
-     *	Saves settings back to the DB - called before shutdown.
-     */
-    public static function save() {
-	    // out with the old...
-	    $query = new Query('delete',array(
-	    	'table' => 'config'
-	    ));
-	    $query->execute();
-	    
-	    // and in with the new! (note: because the column name is key, we need backticks)
-	    $query = new Query('create',array(
-	    	'table' => 'config',
-	    	'data' => array('field'=>'','value'=>'')
-	    ));
-	    // we're running a bunch of inserts - so we'll prepare, then iterate.
-	    $stmt = DB::Prepare($query->parse_sql());   
-	    foreach (static::$settings as $key => $value) {
-	    	// we don't store database connection info in the database.
-	    	if ($key != 'db') {
-	    		
-	    		// the console environment must be set explicity in bootstrap.php - it will not be saved.
-	    		if ($key == 'env' && $value == 'console') $value = 'dev';
-	    		
-	    		// arrays will be json encoded - it's faster than serialize (and don't need benefits of serialize)
-	    		if (is_array($value)) $value = json_encode($value);
-	    		
-		    	$testes = $stmt->execute(array($key,$value));
-	    	}
+
+	public static $data = array();
+
+	/**
+	 *	Load settings from config.ini.php
+	 */
+	public static function load() {
+
+		// load config file. no room for error here.
+		//		@todo: generate a more helpful error response - with link to installer.
+		if (file_exists(PATH . 'config.ini.php')) {
+	    	static::$data = parse_ini_file(PATH . 'config.ini.php', true);
 	    }
-    }
-    
-    /**
-     *  Retrieve a setting.
-     * 
-     *  @param string $key 
-     *  @param mixed $default optional, defaults to false 
-     *  @return mixed The desired setting or the passed default. 
-     */
-    public static function get($key, $default = false) {
-        if (isset(static::$settings[$key])) return static::$settings[$key];
-        else return $default;
-    }
-    
-    /**
-     * Set a setting.
-     * 
-     * @param string $key
-     * @param mixed $value
-     */
-    public static function set($key, $value) {
-        static::$settings[$key] = $value;
-    }
-    
-    /**
-     *	Load up the database config file
-     */
-    private static function loadDB() {
+	    else throw new Exception('Cannot find configuration file - this probably means you haven\'t installed Aphid properly or at all.');
+	}
+
+	/**
+	 *	Get an item from Config::data using "dot" notation.
+	 *
+	 *	(code from the Laravel framework, licensed under the MIT License)
+	 */
+	public static function get($key = null, $default = false) {
+
+		if (is_null($key)) return static::$data;
+
+		$array = static::$data;
+
+		foreach (explode('.', $key) as $segment) {
+
+			if (! is_array($array) || ! array_key_exists($segment, $array)) return $default;
+
+			$array = $array[$segment];
+		}
+
+		return $array;
+	}
+
+	/**
+	 *	Set an item in Config::data using "dot" notation.
+	 *
+	 *	(code from the Laravel framework, licensed under the MIT License)
+	 */
+	public static function set($key, $value) {
+
+		$array =& static::$data;
+		$keys = explode('.',$key);
+
+		while (count($keys) > 1) {
+
+			$key = array_shift($keys);
+
+			if (! isset($array[$key]) || ! is_array($array[$key]))
+				$array[$key] = array();
+
+			$array =& $array[$key];
+		}
+
+		$array[array_shift($keys)] = $value;
+	}
+
+	public static function save() {
 	    
-	    if (file_exists(PATH . 'config.php'))
-	    	static::$settings['db'] = require PATH . 'config.php';
-	    else throw new Exception('Cannot find database configuration file - this probably means you haven\'t installed Aphid properly or at all.');
-    }
+	    // build ini content.
+	    $content = ""; 
+        foreach (static::$data as $key=>$elem) { 
+            $content .= "[".$key."]\n"; 
+            foreach ($elem as $key2=>$elem2) { 
+                if(is_array($elem2)) 
+                { 
+                    for($i=0;$i<count($elem2);$i++) 
+                    { 
+                        $content .= $key2."[] = \"".$elem2[$i]."\"\n"; 
+                    } 
+                } 
+                else if($elem2=="") $content .= $key2." = \n"; 
+                else $content .= $key2." = \"".$elem2."\"\n"; 
+            } 
+        }
+
+        // Add protection against direct access - can only be accessed by parse_ini_file.
+        $safety = ";<?php die(\"Permission Denied. Cannot Access Directly.\");\n";
+        $safety.= ";/*\n\n";
+        $content = $safety . $content . "\n;*/\n;?>";
+
+        // write to file.
+        if (!$handle = fopen(PATH . 'config.ini.php', 'w')) { 
+	        throw new Exception('Unable to open Config File.');
+	    } 
+	    if (!fwrite($handle, $content)) {
+	    	fclose($handle);
+	        throw new Exception('Unable to write to Config File.'); 
+	    } 
+	    fclose($handle);
+	}
 }
