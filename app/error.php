@@ -1,5 +1,11 @@
 <?php defined("PRIVATE") or die("Permission Denied. Cannot Access Directly.");
 
+//
+//
+//	@TODO: FIX ALL DIS SHIT, USE THE NEW Response CLASS
+//
+//
+
 class Error {
 	
     /**
@@ -26,7 +32,7 @@ class Error {
 	}
 	
 	public static function shutdown() {
-		if (!is_null($error = error_get_last())) {
+		if ( ! is_null($error = error_get_last())) {
 			extract($error, EXTR_SKIP);
 			static::exception(new ErrorException($message, $type, 0, $file, $line));
 		}

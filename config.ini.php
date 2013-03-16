@@ -6,9 +6,14 @@ name = "aphid"
 host = "localhost"
 user = "root"
 pass = "root"
+
 [settings]
+timezone = "America/Los_Angeles"
 env = "dev"
-base_url = "/"
+base_uri = "/"
+index_model = "index"
+theme = "default"
+per_page = false
 
 ;*/
 ;?>

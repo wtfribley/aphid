@@ -343,7 +343,10 @@ class Query {
         if (count($data) == 1) {
             $data = $data[0];
             // single row and single field? lets not return an array at all!
-            if ($this->single_field == true) $data = array_values($data)[0];
+            if ($this->single_field == true) {
+                $data = array_values($data);
+                $data = $data[0];
+            }
         }
         
         // write-type requests simply return the number of rows affected.
