@@ -9,8 +9,9 @@ class Request {
 
 	/**
 	 *	Format in which to send a response - defaults to HTML.
+	 *    note: available to the entire application.
 	 */
-	public $format = 'html';
+	public static $format = 'html';
 
 	/**
 	 *	Options, used to contruct an instance of Model.
@@ -40,7 +41,7 @@ class Request {
 
 		// (from Accept header - superceded by anything determined from the URI, see below)
 
-		if (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'json')) $this->format = 'json';
+		if (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'json')) static::$format = 'json';
 
 		//---------------
 		//	Parse URL
@@ -53,7 +54,7 @@ class Request {
 		}
 
 		// remove the base uri in case we've installed in a subdirectory.
-		$base_uri = Config::get('settings.base_uri','/');
+		$base_uri = Config::get('system.base_uri','/');
 		$pattern = '/^(' . preg_quote($base_uri,'/') . ')/';
 		$uri = preg_replace($pattern, '', $_SERVER['REQUEST_URI']);
 
@@ -67,23 +68,23 @@ class Request {
 		// (from URI - this supercedes the Accept header)
 
 		if ($uri[0] == 'api') {
-			$this->format = 'json';
+			static::$format = 'json';
 
 			// remove the unnecessary api segment.
 			array_shift($uri);
 		}
 		else if ($base_uri == '/api/') {
-			$this->format = 'json';
+			static::$format = 'json';
 		}
 		else if (substr(end($uri), -5) == '.json') {
-			$this->format = 'json';
+			static::$format = 'json';
 
 			// remove the .json extension.
 			$last_segment = array_pop($uri);
 			$uri[] = substr($last_segment, 0, -5);
 		}
 		else if (substr(end($uri), -5) == '.html') {
-			$this->format = 'html';
+			static::$format = 'html';
 
 			// remove the .html extension.
 			$last_segment = array_pop($uri);
@@ -95,7 +96,7 @@ class Request {
 		//-----------------------------
 
 		// this handles the 'home' page - defaults to the model named 'index.'
-		if ($uri[0] === '') $uri[0] = Config::get('settings.index_model', 'index');
+		if ($uri[0] === '') $uri[0] = Config::get('system.index_model', 'index');
 
 		$options['model'] = $uri[0];
 
@@ -137,7 +138,7 @@ class Request {
 		//	Instantiate the Controller
 		//------------------------------
 
-		$controller = new Controller($this->action, $this->format, $this->options);
+		$controller = new Controller($this->action, static::$format, $this->options);
 		$this->response = $controller->response;
 
 		unset($controller);

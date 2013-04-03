@@ -24,34 +24,32 @@ class Controller {
 		// Run Aphid's Default Controller
 		else {
 
-			//-------------------------------
-			//	Create Model, Handle Errors
-			//-------------------------------
+			//--------------------------------------
+			//	Create Model
+			//
+			//  Errors here throw ModelException.
+			//  Catch it here if you wish to alter
+			//  default error behavior.
+			//--------------------------------------
 
-			try {
-				// instatiate the model.
-				$model = new Model($action, $options);
+			// instatiate the model.
+			$model = new Model($action, $options);
 
-				// no model data means a 404.
-				if (empty($model->data)) {
-					$action = 'not found';
+			// no model data means a 404.
+			if (empty($model->data)) {
+				$action = 'not found';
 
-					// we'll be passing on the model's name to the 404 template.
-					$model->data = array('model'=>$options['model']);
-					$template = '404';
-				}
-				else {
-					$template = $model->get_template();
-				}
-
-				$this->response = new Response($this->success_code_map[$action], $model->data, $format, $template);
-
-				unset($model);
-
+				// we'll be passing on the model's name to the 404 template.
+				$model->data = array('model'=>$options['model']);
+				$template = '404';
 			}
-			catch (ModelException $e) {
-				$this->response = new Response($e->get_code(), $e->get_message(), $format, $e->get_code('string'));				
+			else {
+				$template = $model->get_template();
 			}
+
+			$this->response = new Response($this->success_code_map[$action], $model->data, $format, $template);
+
+			unset($model);
 		}
 	}
 }

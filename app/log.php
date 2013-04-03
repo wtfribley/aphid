@@ -7,12 +7,12 @@
  */
 class Log {
 
-    public static function write($severity, $message){
+    public static function write($code, $message){
         
-        $line = date('m-d-Y hA:i:s') . ' [ ' . $severity . ' ] --> ' . $message . PHP_EOL;
+        $line = date('m-d-Y hA:i:s') . ' [ ' . $code . ' ] --> ' . $message . PHP_EOL;
         
         // Write to the log file.
-        $log = Config::get('logfile','aphid');
+        $log = Config::get('system.log_file','aphid');
         if($log = @fopen(PATH . 'logs/' . $log . '.log', 'a+'))
         {
             fwrite($log, $line);
@@ -21,7 +21,7 @@ class Log {
     }
     
     public static function exception($e){
-        static::write('error', static::format($e));
+        static::write($e->getCode(), static::format($e));
     }
 
     private static function format($e){

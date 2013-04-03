@@ -6,7 +6,9 @@ class Model {
 
 	public $data = array();
 
-	public function __construct($action = null, $options = null) {
+	private $options = array();
+
+	public function __construct($action = null, $options = array()) {
 
 		// table is synonmous with model...
 		if (isset($options['table'])) {
@@ -35,28 +37,40 @@ class Model {
 			throw new ModelException($this->data);
 		}
 
-		// explode allowed groups (i.e. permissions)
-		$this->metadata['create'] = explode(',', $this->metadata['create']);
-		$this->metadata['read']   = explode(',', $this->metadata['read']);
-		$this->metadata['update'] = explode(',', $this->metadata['update']);
-		$this->metadata['delete'] = explode(',', $this->metadata['delete']);
+		if ($action != 'metadata') {
 
-		// explode relations
-		$this->metadata['children'] = explode(',', $this->metadata['children']);
-		$this->metadata['parents'] = explode(',', $this->metadata['parents']);
-		$this->metadata['siblings'] = explode(',', $this->metadata['siblings']);
+			//-----------------------
+			//	PERMISSIONS
+			//-----------------------
 
-
-		// Do Action
-		if ( ! is_null($action)) {
-			// is action valid?
-			if (in_array($action, array('create','read','update','delete'))) {
-				
-				// run the action, throws ModelException if there's an error.
-				$this->$action($options);
+			// per-model
+			if ( ! isset($options['permit_all']) || $options['permit_all'] !== true) {
+				if ( ! $this->authorize($action)) throw new ModelException($this->data);
 			}
-			// no.
-			else throw new Exception($action . ' is not a supported Model action.');
+
+			// per-row @todo: only works for read queries... figure out how to implement with the rest of crud (well, really only ud).
+			if ( ! empty(array_intersect($this->metadata['per_row'], User::get_groups('id'))) ) {
+				$options['related_to'] = array('users', User::$data['id']);
+			}
+
+			//----------------
+			//	TAKE ACTION
+			//----------------
+
+			if ( ! is_null($action)) {
+				// is action valid?
+				if (in_array($action, array('create','read','update','delete'))) {
+					
+					// run the action, throws ModelException if there's an error.
+					$this->$action($options);
+				}
+				// no.
+				else throw new Exception($action . ' is not a supported Model action.');
+			}
+			// no action yet? store options for later.
+			else {
+				$this->options = $options;
+			}
 		}
 	}
 
@@ -65,10 +79,8 @@ class Model {
 	 */
 	public function create($options) {
 
-		// get permission.
-		if ( ! isset($options['permit_all']) || $options['permit_all'] !== true) {
-			if ( ! $this->authorize('create')) throw new ModelException($this->data);
-		}
+		// merge stored options.
+		$options = array_merge($this->options, $options);
 
 		// 'data' is a mandatory option.
 		if ( ! isset($options['data'])) {
@@ -113,13 +125,8 @@ class Model {
 	 */
 	public function read($options = array()) {
 
-		// the constructor might pass a null value.
-		if (is_null($options)) $options = array();
-
-		// get permission.
-		if ( ! isset($options['permit_all']) || $options['permit_all'] !== true) {
-			if ( ! $this->authorize('create')) throw new ModelException($this->data);
-		}
+		// merge stored options.
+		$options = array_merge($this->options, $options);
 
 		// for convenience
 		$self = $options['table'] = $this->metadata['name'];
@@ -190,7 +197,7 @@ class Model {
 			}
 
 			// format for parents.
-			if (in_array($options['related_to'][0], $this->metadata['parents'])) {
+			else if (in_array($options['related_to'][0], $this->metadata['parents'])) {
 
 				$where = $self . '.' . $options['related_to'][0] . '_id IN (';
 
@@ -202,7 +209,7 @@ class Model {
 			}
 
 			// format for siblings.
-			if (in_array($options['related_to'][0], $this->metadata['siblings'])) {
+			else if (in_array($options['related_to'][0], $this->metadata['siblings']) || in_array($options['related_to'][0], $this->metadata['per_row'])) {
 
 				// for readability
 				$sibling = $options['related_to'][0];
@@ -221,6 +228,7 @@ class Model {
 					'where'	=>	$options['related_to'][1]
 				));
 			}
+			else throw new Exception($options['related_to'][0] . ' is not related to this model (' . $self . ').');
 
 			// add the subquery's sql.
 			$where.= rtrim(';',$subquery->sql) . ')';
@@ -325,10 +333,8 @@ class Model {
 	 */
 	public function update($options) {
 
-		// get permission.
-		if ( ! isset($options['permit_all']) || $options['permit_all'] !== true) {
-			if ( ! $this->authorize('create')) throw new ModelException($this->data);
-		}
+		// merge stored options.
+		$options = array_merge($this->options, $options);
 
 		// transpose 'id' and 'name' to where.
 		if (isset($options['id'])) $options['where'] = array('id', $options['id']);
@@ -392,10 +398,8 @@ class Model {
 	 */
 	public function delete($options) {
 
-		// get permission.
-		if ( ! isset($options['permit_all']) || $options['permit_all'] !== true) {
-			if ( ! $this->authorize('create')) throw new ModelException($this->data);
-		}
+		// merge stored options.
+		$options = array_merge($this->options, $options);
 
 		// 'where' is a mandatory option
 		if ( ! isset($options['where'])) {
@@ -421,6 +425,14 @@ class Model {
 			$this->data['query'] = $query;
 			throw new ModelException($this->data);
 		}
+	}
+
+	/**
+	 *	Return the proper template (based on number of entries selected).
+	 */
+	public function get_template() {
+		if (is_string($this->data) || count($this->data) > 1) return $this->metadata['s_template'];
+		else return $this->metadata['pl_template'];
 	}
 
 	/**
@@ -461,7 +473,7 @@ class Model {
 	}
 
 	/**
-	 *	@method: authorize
+	 *	Per-Model Authorization.
 	 *
 	 *	Authorize this model to do the desired action, given the current User's Groups' permissions.
 	 *
@@ -469,11 +481,9 @@ class Model {
 	 */
 	private function authorize($action) {
 
-		$user_groups = User::get_groups('id');
-
 		// if an intersection of the user's groups' ids and the model's list of allowed group ids
 		//	for this action produces an empty array, it means we DO NOT have permission.
-		if (empty(array_intersect($this->metadata[$action], $user_groups))) {
+		if ( empty(array_intersect($this->metadata[$action], User::get_groups('id'))) ) {
 			
 			// if the user is in the anonymous group, they cannot be in any others - and it means they haven't logged in.
 			($user_groups[0] == 0) ? $error = 401 : $error = 403;

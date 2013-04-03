@@ -74,10 +74,12 @@ class Response {
 		}
 	}
 
-	public function send($json_to_file = false) {
+	public function send() {
 
 		// no matter the format, json can be saved to a file in the theme folder.
 		//	this can be useful for bootstrapping certain Javascript apps.
+		$json_to_file = Config::get('settings.json_to_file');
+
 		if (is_string($json_to_file)) {
 			
 			$path = THEME . 'assets/json/' . $json_to_file . '.js';
@@ -100,7 +102,7 @@ class Response {
 		}
 
 		// check for the console environment
-		if (Config::get('settings.env') == 'console') {
+		if (Config::get('system.env') == 'console') {
 			Log::write($this->headers[0], $this->body);
 		}
 		// normal operation.

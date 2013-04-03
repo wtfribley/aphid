@@ -163,8 +163,8 @@ class Query {
 				$rel_fields = '';
 
 				foreach ($options['rel_fields'] as $tablefield) {
-					$field = explode('.', $tablefield);
-					$rel_fields.= $tablefield . ' AS ' . $field[0] . '_' . $field[1] . ',';
+					$t_f = explode('.', $tablefield);
+					$rel_fields.= $tablefield . ' AS ' . $t_f[0] . '_' . $t_f[1] . ',';
 				}
 
 				// clean up the trailing comma.
@@ -264,6 +264,8 @@ class Query {
 		$this->fields = 'SET ';
 		foreach ($fields_values as $field=>$value) {
 			$this->fields.= $field . '=?,';
+
+			if (is_array($value)) $value = json_encode($value);
 			$this->values[] = $value;
 		}
 

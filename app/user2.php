@@ -2,41 +2,50 @@
 
 class User {
 
+	/**
+	 *	User Data - default is set here to indicate an anonymous user.
+	 *
+	 *  @todo: look into defaulting this in the database instead of hard coding... good idea?
+	 */
 	public static $data = array(
 		'groups'	=>	array('id'=>0,'name'=>'anonymous')
 	);
+
+	public static $metadata = array();
 
 	public static function load() {
 
 		// we have a recognized user.
 		if ($id = Session::get('user_id')) {
+			
+			// throws ModelException on error.
+			$user = new Model('read', array(
+				'model'	=>	'users',
+				'id'	=>	$id
+			));
 
-			try {			
-				$user = new Model('read', array(
-					'model'	=>	'users',
-					'id'	=>	$id
-				));
+			if ( ! empty($user->data)) {
+				static::$data = $user->data;
+				static::$metadata = $user->metadata;
 			}
-			catch (ModelException $e) {
-				$response = new Response($e->get_code(), $e->get_message(), 'html', $e->get_code('string'));
-				$response->send();
-				exit(0);
-			}
-
-			if ( ! empty($user->data)) static::$data = $user->data;
 
 			unset($user);
 		}
 	}
 
-	public static function get_groups($field = null) {
+	/**
+	 *	Return the User's Groups.
+	 *
+	 *	optionally select a single field (i.e. name or id) to return from each group.
+	 */
+	public static function get_groups($field = null, $default = false) {
 
 		if (is_null($field)) return static::$data['groups'];
 
 		$groups = array();
 		foreach (static::$data['groups'] as $group) {
 			if (isset($group[$field])) $groups[] = $group[$field];
-			else throw new Exception('User::get_groups() - Groups model does not have field ' . $field);
+			else return $default;
 		}
 
 		return $groups;
@@ -44,18 +53,11 @@ class User {
 
 	public static function login($username, $password, $data = null) {
 
-		// get user by username.
-		try {			
-			$user = new Model('read', array(
-				'model'	=>	'users',
-				'where'	=>	array('username',$username)
-			));
-		}
-		catch (ModelException $e) {
-			$response = new Response($e->get_code(), $e->get_message(), 'html', $e->get_code('string'));
-			$response->send();
-			exit(0);
-		}
+		// get user by username.			
+		$user = new Model('read', array(
+			'model'	=>	'users',
+			'where'	=>	array('username',$username)
+		));
 
 		// no results mean a bad username
 		if (empty($user->data)) {
@@ -105,19 +107,12 @@ class User {
 		// passed data is used to update the user on logout.
 		if (is_array($data)) {
 
-			try {
-				$user = new Model('update', array(
-					'model'			=>	'users',
-					'data'			=>	$data,
-					'id'			=>	static::$data['id'],
-					'permit_all'	=>	true
-				));
-			} 
-			catch (ModelException $e) {
-				$response = new Response($e->get_code(), $e->get_message(), 'html', $e->get_code('string'));
-				$response->send();
-				exit(0);
-			}
+			$user = new Model('update', array(
+				'model'			=>	'users',
+				'data'			=>	$data,
+				'id'			=>	static::$data['id'],
+				'permit_all'	=>	true
+			));
 		}
 
 		// a logged-in user is identified by the 'user_id' session value.

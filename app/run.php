@@ -62,11 +62,11 @@ register_shutdown_function(array('Error','shutdown'));
 Config::load();
 define('THEME', PATH . 'themes/' . Config::get('settings.theme','default') . '/');
 
-date_default_timezone_set(Config::get('settings.timezone','America/Los_Angeles'));
+date_default_timezone_set(Config::get('system.timezone','America/Los_Angeles'));
 
 // setting to 'console' will simply log output, rather than send anything to the browser.
 //		(note: this setting be saved - run once with a different setting before commenting out)
-//Config::set('settings.env','console');
+//Config::set('system.env','console');
 
 
 /*
