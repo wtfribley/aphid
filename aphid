@@ -1,8 +1,10 @@
+#!/usr/bin/php
+
 <?php
 
 /**
- *      RESTful API for flexible and transparent database interaction.
- *
+ *      APHID Command Line API.
+ * 
  *      Developed by @wtfribley. 
  */
 

@@ -83,7 +83,6 @@ User::load();
 $request = new Request();
 $request->response->send();
 
-
 /*
  *		Run all of our shutdown functions.
  */
